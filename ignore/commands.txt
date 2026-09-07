@@ -1,0 +1,12 @@
+Dev server (live reload, for testing changes):
+npm run tauri dev
+Run from C:\termizen. Opens the app window directly; no output file, it just runs.
+
+Build installers (after any update):
+npm run tauri build
+Run from C:\termizen. Compiles frontend (tsc && vite build) then Rust in release mode, produces:
+
+- C:\termizen\src-tauri\target\release\bundle\nsis\Termizen_<version>_x64-setup.exe
+- C:\termizen\src-tauri\target\release\bundle\msi\Termizen_<version>_x64_en-US.msi
+
+Version number comes from src-tauri/tauri.conf.json's "version" field (currently 0.1.0) — bump it there before a release build if you want the installer filename/Windows "Installed apps" entry to reflect a new version.

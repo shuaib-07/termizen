@@ -1,0 +1,467 @@
+@import "tailwindcss";
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+}
+
+:root,
+[data-theme="sefirah"] {
+  --radius: 0.75rem;
+
+  /* Sefirah: Smoked Obsidian Mica */
+  --background: oklch(0.13 0.006 310 / 0.60);
+  --foreground: oklch(0.96 0 0);
+  --card: oklch(0.20 0.008 310 / 0.45);
+  --card-foreground: oklch(0.96 0 0);
+  --popover: oklch(0.16 0.008 310 / 0.98);
+  --popover-foreground: oklch(0.96 0 0);
+  --secondary: oklch(0.24 0.008 310 / 0.50);
+  --secondary-foreground: oklch(0.95 0 0);
+  --muted: oklch(0.22 0.008 310 / 0.45);
+  --muted-foreground: oklch(0.70 0.01 310);
+  --accent: oklch(0.26 0.01 310 / 0.55);
+  --accent-foreground: oklch(0.98 0 0);
+  --destructive: oklch(0.58 0.22 27);
+  --destructive-foreground: oklch(0.98 0 0);
+  --border: oklch(1 0 0 / 0.07);
+  --input: oklch(1 0 0 / 0.08);
+
+  /* Default Accent: Electric Blue */
+  --primary: oklch(0.62 0.19 260);
+  --primary-foreground: oklch(0.98 0 0);
+  --ring: oklch(0.62 0.19 260 / 0.6);
+}
+
+[data-theme="deep-blue"] {
+  --background: oklch(0.17 0.01 260 / 0.55);
+  --foreground: oklch(0.95 0 0);
+  --card: oklch(0.21 0.012 260 / 0.70);
+  --card-foreground: oklch(0.95 0 0);
+  --popover: oklch(0.19 0.012 260 / 0.95);
+  --popover-foreground: oklch(0.95 0 0);
+  --secondary: oklch(0.28 0.01 260 / 0.65);
+  --secondary-foreground: oklch(0.95 0 0);
+  --muted: oklch(0.24 0.01 260 / 0.55);
+  --muted-foreground: oklch(0.68 0.01 260);
+  --accent: oklch(0.30 0.02 260 / 0.65);
+  --accent-foreground: oklch(0.98 0 0);
+  --border: oklch(1 0 0 / 0.09);
+  --input: oklch(1 0 0 / 0.10);
+}
+
+[data-theme="neutral"] {
+  --background: oklch(0.13 0 0 / 0.60);
+  --foreground: oklch(0.96 0 0);
+  --card: oklch(0.19 0 0 / 0.45);
+  --card-foreground: oklch(0.96 0 0);
+  --popover: oklch(0.15 0 0 / 0.98);
+  --popover-foreground: oklch(0.96 0 0);
+  --secondary: oklch(0.22 0 0 / 0.50);
+  --secondary-foreground: oklch(0.95 0 0);
+  --muted: oklch(0.20 0 0 / 0.45);
+  --muted-foreground: oklch(0.68 0 0);
+  --accent: oklch(0.24 0 0 / 0.55);
+  --accent-foreground: oklch(0.98 0 0);
+  --border: oklch(1 0 0 / 0.07);
+  --input: oklch(1 0 0 / 0.08);
+}
+
+/* Accent Variations */
+[data-accent="blue"] {
+  --primary: oklch(0.62 0.19 260);
+  --primary-foreground: oklch(0.98 0 0);
+  --ring: oklch(0.62 0.19 260 / 0.6);
+}
+
+[data-accent="lavender"] {
+  --primary: oklch(0.65 0.22 305);
+  --primary-foreground: oklch(0.98 0 0);
+  --ring: oklch(0.65 0.22 305 / 0.6);
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+  /* Transparent so the native Mica backdrop (set in Rust via window-vibrancy)
+     shows through -- panels get their own translucent --card/--background,
+     the page root itself must not paint an opaque color. */
+  background: transparent;
+  overflow: hidden;
+}
+
+body {
+  color: var(--foreground);
+  font-family:
+    Inter,
+    "Segoe UI",
+    system-ui,
+    -apple-system,
+    sans-serif;
+}
+
+/* Themed scrollbars app-wide (WebView2 is Chromium, so ::-webkit-scrollbar
+   applies) -- otherwise the OS default light scrollbar flashes over this
+   dark/Mica theme anywhere something overflows (tab bar, sidebar, logs). */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+  background-color: var(--border);
+  border-radius: var(--radius-md);
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background-color: var(--muted-foreground);
+  background-clip: padding-box;
+}
+
+/* transitions.dev menu-dropdown -- values verbatim from the skill's
+   05-menu-dropdown.md. Selectors adapted for Radix Select: Radix's own
+   data-state="open"|"closed" (Presence-driven, so the panel stays mounted
+   through the closing transition before unmounting) replaces the vanilla
+   .is-open/.is-closing class toggling the skill's plain-JS orchestration
+   uses -- functionally identical, just driven by Radix's state machine
+   instead of hand-rolled setTimeout cleanup. data-side is also Radix's own
+   (which edge the panel opened from), used in place of a manually-set
+   data-origin. The pre-open/closing scale distinction the vanilla version
+   makes (0.97 at rest vs 0.99 mid-close) collapses to one value here since
+   Radix only exposes two states, not three -- --dropdown-closing-scale is
+   kept for fidelity to the token set but unused by this selector.
+*/
+:root {
+  --dropdown-open-dur: 250ms;
+  --dropdown-close-dur: 150ms;
+  --dropdown-pre-scale: 0.97;
+  --dropdown-closing-scale: 0.99;
+  --dropdown-ease: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.t-dropdown {
+  will-change: transform, opacity;
+}
+.t-dropdown[data-side="bottom"] {
+  transform-origin: top center;
+}
+.t-dropdown[data-side="top"] {
+  transform-origin: bottom center;
+}
+.t-dropdown[data-side="right"] {
+  transform-origin: center left;
+}
+.t-dropdown[data-side="left"] {
+  transform-origin: center right;
+}
+
+.t-dropdown[data-state="open"] {
+  transform: scale(1);
+  opacity: 1;
+  transition:
+    transform var(--dropdown-open-dur) var(--dropdown-ease),
+    opacity var(--dropdown-open-dur) var(--dropdown-ease);
+}
+.t-dropdown[data-state="closed"] {
+  transform: scale(var(--dropdown-pre-scale));
+  opacity: 0;
+  transition:
+    transform var(--dropdown-close-dur) var(--dropdown-ease),
+    opacity var(--dropdown-close-dur) var(--dropdown-ease);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .t-dropdown {
+    transition: none !important;
+  }
+}
+
+/* ── transitions.dev modal open/close ─────────────────── */
+:root {
+  --modal-open-dur: 250ms;
+  --modal-close-dur: 150ms;
+  --modal-scale: 0.96;
+  --modal-scale-close: 0.96;
+  --modal-ease: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.t-modal {
+  transform-origin: center;
+  will-change: transform, opacity;
+}
+.t-modal.is-open {
+  animation: t-modal-in var(--modal-open-dur) var(--modal-ease) forwards;
+}
+.t-modal.is-closing {
+  animation: t-modal-out var(--modal-close-dur) var(--modal-ease) forwards;
+  pointer-events: none;
+}
+
+@keyframes t-modal-in {
+  from {
+    transform: scale(var(--modal-scale));
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes t-modal-out {
+  from {
+    transform: scale(1);
+    opacity: 1;
+  }
+  to {
+    transform: scale(var(--modal-scale-close));
+    opacity: 0;
+  }
+}
+
+.t-modal-backdrop {
+  will-change: opacity, backdrop-filter;
+}
+.t-modal-backdrop.is-open {
+  animation: t-backdrop-in var(--modal-open-dur) var(--modal-ease) forwards;
+}
+.t-modal-backdrop.is-closing {
+  animation: t-backdrop-out var(--modal-close-dur) var(--modal-ease) forwards;
+  pointer-events: none;
+}
+
+@keyframes t-backdrop-in {
+  from {
+    opacity: 0;
+    backdrop-filter: blur(0px);
+  }
+  to {
+    opacity: 1;
+    backdrop-filter: blur(4px);
+  }
+}
+
+@keyframes t-backdrop-out {
+  from {
+    opacity: 1;
+    backdrop-filter: blur(4px);
+  }
+  to {
+    opacity: 0;
+    backdrop-filter: blur(0px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .t-modal,
+  .t-modal.is-open,
+  .t-modal.is-closing,
+  .t-modal-backdrop,
+  .t-modal-backdrop.is-open,
+  .t-modal-backdrop.is-closing {
+    animation: none !important;
+    transition: none !important;
+    transform: none !important;
+    opacity: 1 !important;
+  }
+}
+
+/* ── transitions.dev success check ────────────────────── */
+:root {
+  --check-opacity-dur: 500ms;
+  --check-rotate-dur: 500ms;
+  --check-rotate-from: 80deg;
+  --check-bob-dur: 500ms;
+  --check-y-amount: 40px;
+  --check-blur-dur: 500ms;
+  --check-blur-from: 10px;
+  --check-path-dur: 500ms;
+  --check-path-delay: 80ms;
+  --check-ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --check-ease-opacity: cubic-bezier(0.22, 1, 0.36, 1);
+  --check-ease-rotate: cubic-bezier(0.22, 1, 0.36, 1);
+  --check-ease-bob: cubic-bezier(0.34, 1.35, 0.64, 1);
+  --check-ease-path: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.t-success-check {
+  display: inline-block;
+  transform-origin: center;
+  opacity: 0;
+  will-change: transform, opacity, filter;
+}
+.t-success-check svg { display: block; overflow: visible; }
+.t-success-check svg polyline,
+.t-success-check svg path {
+  stroke-dasharray: 40;
+  stroke-dashoffset: 40;
+}
+
+.t-success-check[data-state="in"] {
+  animation:
+    t-check-fade   var(--check-opacity-dur) var(--check-ease-opacity) forwards,
+    t-check-rotate var(--check-rotate-dur)  var(--check-ease-rotate)  forwards,
+    t-check-blur   var(--check-blur-dur)    var(--check-ease-out)     forwards,
+    t-check-bob    var(--check-bob-dur)     var(--check-ease-bob)     forwards;
+}
+.t-success-check[data-state="in"] svg polyline,
+.t-success-check[data-state="in"] svg path {
+  animation: t-check-draw var(--check-path-dur) var(--check-ease-path) var(--check-path-delay, 0ms) forwards;
+}
+
+@keyframes t-check-fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes t-check-rotate {
+  from { transform: rotate(var(--check-rotate-from)); }
+  to   { transform: rotate(0deg); }
+}
+@keyframes t-check-blur {
+  from { filter: blur(var(--check-blur-from)); }
+  to   { filter: blur(0); }
+}
+@keyframes t-check-bob {
+  from { translate: 0 var(--check-y-amount); }
+  to   { translate: 0 0; }
+}
+@keyframes t-check-draw { to { stroke-dashoffset: 0; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .t-success-check { animation: none !important; opacity: 1; }
+  .t-success-check svg polyline,
+  .t-success-check svg path { animation: none !important; stroke-dashoffset: 0 !important; }
+}
+
+/* ── transitions.dev shimmer text ─────────────────────── */
+:root {
+  --shimmer-dur: 2000ms;
+  --shimmer-base: #888888;
+  --shimmer-highlight: #ffffff;
+  --shimmer-band: 400%;
+  --shimmer-ease: linear;
+}
+
+.t-shimmer {
+  position: relative;
+  display: inline-block;
+  color: var(--shimmer-base);
+}
+.t-shimmer::before {
+  content: attr(data-text);
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image: linear-gradient(
+    90deg,
+    transparent          0%,
+    transparent         40%,
+    var(--shimmer-highlight) 50%,
+    transparent         60%,
+    transparent        100%
+  );
+  background-size: var(--shimmer-band) 100%;
+  background-repeat: no-repeat;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  -webkit-text-fill-color: transparent;
+  animation: t-shimmer var(--shimmer-dur) var(--shimmer-ease) infinite;
+}
+@keyframes t-shimmer {
+  0%   { background-position: 100% 0; }
+  100% { background-position: 0% 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .t-shimmer::before { animation: none !important; }
+}
+
+/* ── Universal Dropdown Spring Menu Animation ─────────────── */
+:root {
+  --dropdown-open-dur: 200ms;
+  --dropdown-close-dur: 140ms;
+  --dropdown-spring-ease: cubic-bezier(0.16, 1, 0.3, 1);
+  --dropdown-close-ease: cubic-bezier(0.4, 0, 1, 1);
+}
+
+.t-dropdown {
+  transform-origin: var(--radix-select-content-transform-origin, var(--radix-dropdown-menu-content-transform-origin, top center));
+  will-change: transform, opacity;
+}
+
+.t-dropdown[data-state="open"] {
+  animation: t-dropdown-spring-in var(--dropdown-open-dur) var(--dropdown-spring-ease) forwards;
+}
+
+.t-dropdown[data-state="closed"] {
+  animation: t-dropdown-spring-out var(--dropdown-close-dur) var(--dropdown-close-ease) forwards;
+  pointer-events: none;
+}
+
+@keyframes t-dropdown-spring-in {
+  from {
+    opacity: 0;
+    transform: translateY(-6px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes t-dropdown-spring-out {
+  from {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-4px) scale(0.98);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .t-dropdown,
+  .t-dropdown[data-state="open"],
+  .t-dropdown[data-state="closed"] {
+    animation: none !important;
+    transition: none !important;
+    transform: none !important;
+    opacity: 1 !important;
+  }
+}
+
+
