@@ -150,7 +150,7 @@ export interface WebTrafficMetrics {
   timestamp: number;
 }
 
-export type SidebarViewMode = "dashboard" | "servers" | "macros" | "keys" | "settings";
+export type SidebarViewMode = "dashboard" | "servers" | "macros" | "keys" | "settings" | "about";
 
 export type ServerHubSubView = "terminal" | "monitor" | "traffic" | "logs" | "macros";
 

@@ -1,6 +1,6 @@
 import { useId, useState } from "react";
 import { motion, MotionConfig } from "framer-motion";
-import { FolderPlus, Key, LayoutDashboard, Server, Settings, Terminal, Zap } from "lucide-react";
+import { FolderPlus, Info, Key, LayoutDashboard, Server, Settings, Terminal, Zap } from "lucide-react";
 import { BloomMenu, type BloomMenuItem } from "@/components/ui/bloom-menu";
 import { FolderModal } from "@/components/folders/FolderModal";
 import { addEmptyFolder, getEmptyFolders } from "@/lib/folderMetadata";
@@ -17,6 +17,7 @@ export default function Sidebar({
   onSelectNav,
   profiles,
   macros,
+  hasUpdate,
   onOpenProfile,
   onEditProfile,
   onDeleteProfile,
@@ -35,6 +36,7 @@ export default function Sidebar({
   onSelectNav: (nav: SidebarViewMode) => void;
   profiles: ProfileSummary[];
   macros: MacroSummary[];
+  hasUpdate?: boolean;
   onOpenProfile: (profile: ProfileSummary, subView?: ServerHubSubView) => void;
   onEditProfile: (profile: ProfileSummary) => void;
   onDeleteProfile: (id: number) => void;
@@ -100,7 +102,7 @@ export default function Sidebar({
             <span className="font-bold text-sm tracking-tight text-foreground">Termizen</span>
           </div>
           <span className="rounded bg-muted/60 px-1.5 py-0.2 text-[10px] font-mono text-muted-foreground">
-            v0.2.0
+            v0.1.0
           </span>
         </div>
 
@@ -191,6 +193,11 @@ export default function Sidebar({
             <p className="font-semibold text-foreground mb-1">Settings Active</p>
             <p>Customize themes, colors, and container appearance in the main workspace.</p>
           </div>
+        ) : activeNav === "about" ? (
+          <div className="p-4 text-xs text-muted-foreground">
+            <p className="font-semibold text-foreground mb-1">About & Updates</p>
+            <p>View app specs, release notes, license details, and developer profile.</p>
+          </div>
         ) : (
           <div className="p-4 text-xs text-muted-foreground">
             <p>Key Vault active in main view.</p>
@@ -198,8 +205,8 @@ export default function Sidebar({
         )}
       </div>
 
-      {/* Footer: Settings */}
-      <div className="p-2 border-t border-white/[0.04]">
+      {/* Footer: Settings & About */}
+      <div className="p-2 border-t border-white/[0.04] space-y-1">
         <button
           onClick={() => onSelectNav("settings")}
           className={cn(
@@ -216,6 +223,31 @@ export default function Sidebar({
           {activeNav === "settings" && (
             <span className="h-1.5 w-1.5 rounded-full bg-primary" />
           )}
+        </button>
+
+        <button
+          onClick={() => onSelectNav("about")}
+          className={cn(
+            "relative z-10 flex w-full items-center justify-between rounded-lg px-2.5 py-1.5 text-xs transition-colors cursor-pointer",
+            activeNav === "about"
+              ? "text-foreground font-semibold bg-white/[0.06]"
+              : "text-muted-foreground hover:bg-white/[0.03] hover:text-foreground"
+          )}
+        >
+          <span className="flex items-center gap-2">
+            <Info className="h-3.5 w-3.5" />
+            <span>About</span>
+          </span>
+          <div className="flex items-center gap-1.5">
+            {hasUpdate && (
+              <span className="flex items-center gap-1 px-1.5 py-0.2 rounded-full bg-primary/20 text-primary text-[10px] font-semibold border border-primary/30 animate-pulse">
+                Update
+              </span>
+            )}
+            {activeNav === "about" && (
+              <span className="h-1.5 w-1.5 rounded-full bg-primary" />
+            )}
+          </div>
         </button>
       </div>
 

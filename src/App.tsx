@@ -7,6 +7,8 @@ import Sidebar from "./Sidebar";
 import ServerDashboard from "./components/dashboard/ServerDashboard";
 import KeyVaultView from "./components/keys/KeyVaultView";
 import SettingsView, { applyTheme, getStoredAccent, getStoredTheme } from "./components/settings/SettingsView";
+import AboutView from "./components/about/AboutView";
+import { checkAppUpdates, getAutoCheckUpdates, type UpdateInfo } from "./lib/updater";
 import ServerFormModal from "./components/servers/ServerFormModal";
 import { ClosePromptModal } from "@/components/ui/ClosePromptModal";
 import { getStoredCloseBehavior } from "@/lib/closeSettings";
@@ -80,6 +82,25 @@ function AppContent() {
   const [profiles, setProfiles] = useState<ProfileSummary[]>([]);
   const [macros, setMacros] = useState<MacroSummary[]>([]);
   const [ready, setReady] = useState(false);
+  const [updateInfo, setUpdateInfo] = useState<UpdateInfo | null>(null);
+
+  // Auto-check for updates on launch if enabled
+  useEffect(() => {
+    if (getAutoCheckUpdates()) {
+      checkAppUpdates()
+        .then((info) => {
+          if (info.updateAvailable) {
+            setUpdateInfo(info);
+            toast({
+              title: "Update Available",
+              description: `Termizen v${info.latestVersion} is available. Click About in sidebar to view release.`,
+              status: "info",
+            });
+          }
+        })
+        .catch((err) => console.warn("Auto update check failed:", err));
+    }
+  }, []);
 
   // Server Modal
   const [showServerModal, setShowServerModal] = useState(false);
@@ -599,7 +620,7 @@ function AppContent() {
       activeNav={activeNav}
       onSelectNav={(nav) => {
         setActiveNav(nav);
-        if (nav === "dashboard" || nav === "settings" || nav === "keys") {
+        if (nav === "dashboard" || nav === "settings" || nav === "keys" || nav === "about") {
           setActiveId("dashboard");
         }
         if (isMobile) {
@@ -608,6 +629,7 @@ function AppContent() {
       }}
       profiles={profiles}
       macros={macros}
+      hasUpdate={Boolean(updateInfo?.updateAvailable)}
       onOpenProfile={(profile, subView) => {
         handleOpenProfile(profile, subView);
         if (isMobile) {
@@ -723,7 +745,7 @@ function AppContent() {
 
         <div className="relative min-w-0 min-h-0 flex-1">
           {/* Dashboard View */}
-          <div className={cn("h-full w-full", activeId === "dashboard" && activeNav !== "keys" && activeNav !== "settings" ? "block" : "hidden")}>
+          <div className={cn("h-full w-full", activeId === "dashboard" && activeNav !== "keys" && activeNav !== "settings" && activeNav !== "about" ? "block" : "hidden")}>
             <ServerDashboard
               profiles={profiles}
               macros={macros}
@@ -754,9 +776,17 @@ function AppContent() {
             <SettingsView />
           </div>
 
+          {/* About View */}
+          <div className={cn("h-full w-full", activeNav === "about" ? "block" : "hidden")}>
+            <AboutView
+              initialUpdateInfo={updateInfo}
+              onUpdateStatusChange={(info) => setUpdateInfo(info)}
+            />
+          </div>
+
           {/* Open Server Tabs */}
           {tabs.map((tab) => {
-            const isTabVisible = tab.id === activeId && activeNav !== "keys" && activeNav !== "settings";
+            const isTabVisible = tab.id === activeId && activeNav !== "keys" && activeNav !== "settings" && activeNav !== "about";
             return (
               <div
                 key={tab.id}
