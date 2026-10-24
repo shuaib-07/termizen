@@ -4,7 +4,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Loader } from "@/components/Loader";
-import { Folder, Globe, Server } from "lucide-react";
+import { Folder, Plus } from "lucide-react";
+import { FolderModal } from "@/components/folders/FolderModal";
 import { AnimatedCombobox, type ComboboxItem } from "@/components/ui/combobox";
 import { Checkbox } from "@/components/ui/checkbox";
 import { getFolderColor, getEmptyFolders, addEmptyFolder } from "@/lib/folderMetadata";
@@ -17,7 +18,6 @@ export default function MacroEditorView({
   macroId,
   onSave,
   onDone,
-  onAddNewServer,
 }: {
   profiles: ProfileSummary[];
   macros: MacroSummary[];
@@ -31,8 +31,8 @@ export default function MacroEditorView({
   const [name, setName] = useState(editing?.name ?? "");
   const [runMode, setRunMode] = useState<"exec" | "pty">(editing?.runMode ?? "exec");
   const [haltOnError, setHaltOnError] = useState(editing?.haltOnError ?? true);
-  const [profileId, setProfileId] = useState(editing?.profileId != null ? String(editing.profileId) : "global");
   const [folder, setFolder] = useState(editing?.folder ?? "");
+  const [newFolderModalOpen, setNewFolderModalOpen] = useState(false);
   const [shell, setShell] = useState<"powershell" | "cmd">((editing?.shell as "powershell" | "cmd") || "powershell");
   const [stepsText, setStepsText] = useState("");
   const [loadingSteps, setLoadingSteps] = useState(!!macroId);
@@ -46,7 +46,7 @@ export default function MacroEditorView({
         ...getEmptyFolders(),
       ])
     ).sort((a, b) => a.localeCompare(b));
-  }, [profiles, macros]);
+  }, [profiles, macros, folder]);
 
   const folderComboboxItems: ComboboxItem[] = useMemo(() => {
     return existingFolders.map((f) => ({
@@ -56,30 +56,6 @@ export default function MacroEditorView({
       icon: <Folder className="h-3.5 w-3.5" />,
     }));
   }, [existingFolders]);
-
-  // Server combobox items
-  const serverComboboxItems: ComboboxItem[] = useMemo(() => {
-    const items: ComboboxItem[] = [
-      {
-        value: "global",
-        label: "Global (usable on all servers)",
-        description: "Macro can be run across all server sessions",
-        icon: <Globe className="h-3.5 w-3.5 text-sky-400" />,
-      },
-    ];
-
-    profiles.forEach((p) => {
-      items.push({
-        value: String(p.id),
-        label: p.name,
-        description: `${p.username || "root"}@${p.host}${p.folder ? ` • ${p.folder}` : ""}`,
-        color: p.folder ? getFolderColor(p.folder) : undefined,
-        icon: <Server className="h-3.5 w-3.5 text-muted-foreground" />,
-      });
-    });
-
-    return items;
-  }, [profiles]);
 
   useEffect(() => {
     if (!macroId) return;
@@ -106,7 +82,6 @@ export default function MacroEditorView({
       runMode,
       haltOnError,
       steps,
-      profileId: profileId === "global" ? undefined : Number(profileId),
       folder: folder.trim() || undefined,
       shell,
     });
@@ -145,48 +120,40 @@ export default function MacroEditorView({
           </div>
         </div>
 
-        <div className="flex flex-col gap-1">
-          <label className="text-xs text-muted-foreground">Assign to folder (optional)</label>
-          <AnimatedCombobox
-            value={folder}
-            onChange={(val) => {
-              setFolder(val);
-              if (val.trim() && !existingFolders.includes(val.trim())) {
-                addEmptyFolder(val.trim());
-              }
-            }}
-            items={folderComboboxItems}
-            placeholder="Select or create folder..."
-            searchPlaceholder="Search or type new folder..."
-            allowCreate
-            createPrefix="Create new folder"
-            clearLabel="No Folder (Root)"
-            clearValue=""
-            icon={<Folder className="h-3.5 w-3.5" />}
-            className="w-full max-w-xs"
-          />
-          <p className="text-xs text-muted-foreground/70">Groups this macro under that folder name in the Profiles tab, alongside any profiles tagged with the same folder.</p>
-        </div>
-
         <div className="grid grid-cols-2 gap-3">
           <div className="flex flex-col gap-1">
-            <label className="text-xs text-muted-foreground">Assign to server</label>
+            <div className="flex items-center justify-between">
+              <label className="text-xs text-muted-foreground">Assign to folder (optional)</label>
+              <button
+                type="button"
+                onClick={() => setNewFolderModalOpen(true)}
+                className="text-[11px] text-primary hover:underline flex items-center gap-1 cursor-pointer font-medium"
+              >
+                <Plus className="h-3 w-3" />
+                <span>New Folder</span>
+              </button>
+            </div>
             <AnimatedCombobox
-              value={profileId}
-              onChange={setProfileId}
-              items={serverComboboxItems}
-              placeholder="Select target server..."
-              searchPlaceholder="Search server by name or host..."
-              onCreateNew={onAddNewServer}
-              createNewText="+ Create a new server..."
-              icon={<Server className="h-3.5 w-3.5" />}
+              value={folder}
+              onChange={(val) => {
+                setFolder(val);
+                if (val.trim() && !existingFolders.includes(val.trim())) {
+                  addEmptyFolder(val.trim());
+                }
+              }}
+              items={folderComboboxItems}
+              placeholder="Select or create folder..."
+              searchPlaceholder="Search or type new folder..."
+              allowCreate
+              createPrefix="Create new folder"
+              clearLabel="No Folder (Root)"
+              clearValue=""
+              icon={<Folder className="h-3.5 w-3.5" />}
               className="w-full"
+              onCreateNew={() => setNewFolderModalOpen(true)}
+              createNewText="+ Create new folder..."
             />
-            <p className="text-xs text-muted-foreground/70">
-              {runMode === "exec"
-                ? (profileId === "global" ? "Global: runs in your local terminal unless assigned to a server." : "Runs against this server's connection.")
-                : "PTY macros type into open tabs."}
-            </p>
+            <p className="text-xs text-muted-foreground/70">Groups this macro under this folder for categorization.</p>
           </div>
 
           <div className="flex flex-col gap-1">
@@ -200,9 +167,7 @@ export default function MacroEditorView({
                 <SelectItem value="cmd">Command Prompt</SelectItem>
               </SelectContent>
             </Select>
-            <p className="text-xs text-muted-foreground/70">
-              Used when running locally or for Global macros on this machine.
-            </p>
+            <p className="text-xs text-muted-foreground/70">Shell used when executing locally.</p>
           </div>
         </div>
 
@@ -234,6 +199,18 @@ export default function MacroEditorView({
           </Button>
         </div>
       </Card>
+
+      {/* Create New Folder Modal */}
+      <FolderModal
+        isOpen={newFolderModalOpen}
+        onClose={() => setNewFolderModalOpen(false)}
+        existingFolders={existingFolders}
+        onSave={async (_, newName, color) => {
+          addEmptyFolder(newName, color);
+          setFolder(newName);
+          setNewFolderModalOpen(false);
+        }}
+      />
     </div>
   );
 }

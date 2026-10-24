@@ -76,14 +76,14 @@ export function FolderModal({
   return (
     <AnimatePresence>
       {isOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
           {/* Backdrop */}
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={onClose}
-            className="fixed inset-0 bg-black/60 backdrop-blur-xs"
+            className="fixed inset-0 bg-black/70 backdrop-blur-md"
           />
 
           {/* Modal Dialog */}
@@ -92,7 +92,7 @@ export function FolderModal({
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 10 }}
             transition={{ type: "spring", duration: 0.25, bounce: 0.1 }}
-            className="relative w-full max-w-md overflow-visible rounded-2xl border border-border/80 bg-[#15161a] p-6 shadow-2xl backdrop-blur-xl text-card-foreground select-none"
+            className="relative w-full max-w-md overflow-visible rounded-2xl border border-white/[0.09] bg-zinc-950/92 p-6 shadow-2xl backdrop-blur-3xl text-card-foreground select-none"
           >
             {/* Close Button */}
             <button

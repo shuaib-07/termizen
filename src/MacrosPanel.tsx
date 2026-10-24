@@ -2,6 +2,7 @@ import { Pencil, Play, Plus, Server, Terminal, Trash2, Zap } from "lucide-react"
 import type { MacroSummary, ProfileSummary } from "./sessions";
 import { Button } from "@/components/ui/button";
 import { NativeDelete } from "@/components/NativeDelete";
+import { HoverMarquee } from "@/components/ui/HoverMarquee";
 import {
   ContextMenu,
   ContextMenuContent,
@@ -48,9 +49,9 @@ export default function MacrosPanel({
                   onClick={() => onRunMacro?.(m.id)}
                 >
                   <Zap className="h-3.5 w-3.5 flex-shrink-0 text-amber-400" />
-                  <span className="flex-1 truncate">
-                    <span className="font-medium text-foreground">{m.name}</span>{" "}
-                    <span className="text-[11px] text-muted-foreground">
+                  <span className="flex-1 min-w-0 overflow-hidden flex items-center gap-1">
+                    <HoverMarquee text={m.name} className="font-medium text-foreground text-left" />
+                    <span className="text-[11px] text-muted-foreground whitespace-nowrap flex-shrink-0">
                       ({m.runMode}
                       {m.profileId != null ? ` · ${profileName(m.profileId) ?? "profile"}` : ""}
                       {m.folder ? ` · ${m.folder}` : ""})

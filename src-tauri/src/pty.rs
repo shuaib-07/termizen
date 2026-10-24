@@ -37,6 +37,7 @@ pub fn pty_spawn(
     cols: u16,
     rows: u16,
     shell: Option<String>,
+    cwd: Option<String>,
 ) -> Result<u32, String> {
     let pty_system = native_pty_system();
     let pair = pty_system
@@ -48,14 +49,18 @@ pub fn pty_spawn(
         })
         .map_err(|e| e.to_string())?;
 
-    // ponytail: only powershell/cmd resolved by friendly name; WSL distros
-    // (`wsl.exe -d <distro>`) not wired up yet -- add when a profile needs one.
     let exe = match shell.as_deref() {
         Some("cmd") => "cmd.exe",
         Some("powershell") | None => "powershell.exe",
+        Some("wsl") => "wsl.exe",
         Some(other) => other,
     };
-    let cmd = CommandBuilder::new(exe);
+    let mut cmd = CommandBuilder::new(exe);
+    if let Some(ref dir) = cwd {
+        if !dir.trim().is_empty() {
+            cmd.cwd(dir);
+        }
+    }
     let child = pair
         .slave
         .spawn_command(cmd)

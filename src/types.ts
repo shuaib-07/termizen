@@ -150,7 +150,35 @@ export interface WebTrafficMetrics {
   timestamp: number;
 }
 
-export type SidebarViewMode = "dashboard" | "servers" | "macros" | "keys" | "settings" | "about";
+export interface MacroGroupSummary {
+  id: number;
+  name: string;
+  folder?: string;
+  haltOnError: boolean;
+  macroIds: number[];
+  macroCount: number;
+}
+
+export interface WorkspaceTerminalDef {
+  id?: number;
+  position: number;
+  title: string;
+  targetKind: "local" | "ssh";
+  profileId?: number;
+  shell?: string;
+  cwd?: string;
+  startupCommand?: string;
+}
+
+export interface WorkspaceSummary {
+  id: number;
+  name: string;
+  folder?: string;
+  layoutMode: "tabs" | "split";
+  terminals: WorkspaceTerminalDef[];
+}
+
+export type SidebarViewMode = "dashboard" | "servers" | "macros" | "workspaces" | "keys" | "settings" | "about";
 
 export type ServerHubSubView = "terminal" | "monitor" | "traffic" | "logs" | "macros";
 
@@ -161,6 +189,7 @@ export type TabContentState =
   | {
       kind: "local";
       shell?: string;
+      cwd?: string;
       profileId?: number;
       initialCommands?: string[];
       macroId?: number;

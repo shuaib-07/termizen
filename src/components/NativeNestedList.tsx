@@ -4,6 +4,7 @@ import { cn } from "@/lib/utils";
 import { AnimatePresence, motion, MotionConfig } from "framer-motion";
 import { ChevronRight } from "lucide-react";
 import { useState } from "react";
+import { HoverMarquee } from "@/components/ui/HoverMarquee";
 
 export interface ListItem {
   /**
@@ -13,7 +14,7 @@ export interface ListItem {
   /**
    * Display label for the list item
    */
-  label: string;
+  label: string | React.ReactNode;
   /**
    * Optional icon component
    */
@@ -89,6 +90,7 @@ interface NestedItemProps {
 
 function NestedItem({ item, level, activeId, onItemClick, size, showExpandIcon, defaultExpanded, indentSize }: NestedItemProps) {
   const [isExpanded, setIsExpanded] = useState(defaultExpanded);
+  const [isHovered, setIsHovered] = useState(false);
   const hasChildren = item.children && item.children.length > 0;
   const isActive = activeId === item.id;
 
@@ -115,12 +117,19 @@ function NestedItem({ item, level, activeId, onItemClick, size, showExpandIcon, 
         sizeVariants[size],
         "w-full justify-start gap-2 relative overflow-hidden rounded-md transition-colors",
         isActive
-          ? "font-semibold bg-background border border-border text-foreground shadow-sm"
+          ? "font-semibold text-foreground shadow-sm"
           : "hover:bg-accent/40 text-muted-foreground hover:text-foreground"
       )}
       onClick={handleClick}
     >
-      <Comp className="flex items-center gap-2 w-full min-w-0" {...props}>
+      {isActive && (
+        <motion.div
+          layoutId="nested-list-active-pill"
+          className="absolute inset-0 z-0 rounded-md border border-border bg-background shadow-sm pointer-events-none"
+          transition={{ type: "spring", duration: 0.35, bounce: 0.15 }}
+        />
+      )}
+      <Comp className="relative z-10 flex items-center gap-2 w-full min-w-0" {...props}>
         {showExpandIcon && hasChildren && (
           <motion.div
             initial={false}
@@ -137,7 +146,13 @@ function NestedItem({ item, level, activeId, onItemClick, size, showExpandIcon, 
         )}
         {showExpandIcon && !hasChildren && <div className={cn(iconSizeVariants[size], "flex-shrink-0")} />}
         {item.icon && <div className="flex-shrink-0">{item.icon}</div>}
-        <span className="truncate flex-1 text-left min-w-0">{item.label}</span>
+        <div className="flex-1 text-left min-w-0 overflow-hidden">
+          {typeof item.label === "string" ? (
+            <HoverMarquee text={item.label} />
+          ) : (
+            item.label
+          )}
+        </div>
         {item.actions && (
           <span onClick={(e) => e.stopPropagation()} className="ml-auto flex-shrink-0 flex items-center">
             {item.actions}
@@ -148,10 +163,14 @@ function NestedItem({ item, level, activeId, onItemClick, size, showExpandIcon, 
   );
 
   return (
-    <li className="list-none my-0.5">
+    <li
+      className="list-none my-0.5"
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
+    >
       <motion.div
         initial={false}
-        whileHover={{ x: 3 }}
+        whileHover={{ x: 2 }}
         transition={{
           type: "spring",
           stiffness: 300,
@@ -171,28 +190,21 @@ function NestedItem({ item, level, activeId, onItemClick, size, showExpandIcon, 
               itemButton
             )}
           </motion.div>
-          <AnimatePresence>
-            {isActive && (
-              <motion.div
-                aria-hidden="true"
-                initial={{ scale: 0.5, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                exit={{ scale: 0.5, opacity: 0 }}
-                transition={{
-                  type: "spring",
-                  stiffness: 500,
-                  damping: 30,
-                }}
-                className="absolute right-2 top-1/2 -translate-y-1/2 w-1.5 h-1.5 bg-foreground rounded-full"
-              />
-            )}
-          </AnimatePresence>
         </div>
-        {item.subRow && (
-          <div className="w-full" onClick={(e) => e.stopPropagation()}>
-            {item.subRow}
-          </div>
-        )}
+        <AnimatePresence>
+          {item.subRow && (isHovered || isActive) && (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: "auto", opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              transition={{ type: "spring", stiffness: 380, damping: 26 }}
+              className="w-full overflow-hidden"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {item.subRow}
+            </motion.div>
+          )}
+        </AnimatePresence>
       </motion.div>
       {/* Nested children */}
       <AnimatePresence initial={false}>

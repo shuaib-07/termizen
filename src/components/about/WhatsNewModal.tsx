@@ -1,7 +1,7 @@
 import { Sparkles, Terminal, Activity, ShieldCheck, Zap, Globe, Cpu, CheckCircle2, ExternalLink } from "lucide-react";
 import { Modal } from "@/components/ui/modal";
 import { Button } from "@/components/ui/button";
-import { openExternalUrl, type UpdateInfo } from "@/lib/updater";
+import { openExternalUrl, APP_VERSION, type UpdateInfo } from "@/lib/updater";
 
 interface WhatsNewModalProps {
   isOpen: boolean;
@@ -85,7 +85,7 @@ export function WhatsNewModal({ isOpen, onClose, latestUpdate }: WhatsNewModalPr
         <div className="flex items-center justify-between rounded-xl border border-white/[0.06] bg-white/[0.02] p-3">
           <div className="space-y-0.5">
             <div className="flex items-center gap-2">
-              <span className="font-semibold text-sm text-foreground">Termizen v0.1.0</span>
+              <span className="font-semibold text-sm text-foreground">Termizen v{APP_VERSION}</span>
               <span className="rounded bg-primary/20 px-2 py-0.5 text-[10px] font-mono text-primary font-medium border border-primary/30">
                 Official Release
               </span>

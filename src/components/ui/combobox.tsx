@@ -309,19 +309,21 @@ export function AnimatedCombobox({
                 </button>
               )}
 
-              {/* Action button: create new server / entity */}
+              {/* Action button: create new server / entity / folder */}
               {onCreateNew && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIsOpen(false);
-                    onCreateNew();
-                  }}
-                  className="w-full flex items-center gap-2 px-2.5 py-1.5 text-xs rounded-lg text-primary hover:bg-primary/10 transition-colors text-left border-t border-white/[0.06] mt-1 pt-1.5 font-medium cursor-pointer"
-                >
-                  <Plus className="h-3.5 w-3.5 shrink-0" />
-                  <span>{createNewText}</span>
-                </button>
+                <div className="pt-1 mt-1 border-t border-white/[0.06] sticky bottom-0 bg-zinc-950/95 backdrop-blur-md">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsOpen(false);
+                      onCreateNew();
+                    }}
+                    className="w-full flex items-center gap-2 px-2.5 py-1.5 text-xs rounded-lg text-primary hover:bg-primary/15 transition-colors text-left font-medium cursor-pointer"
+                  >
+                    <Plus className="h-3.5 w-3.5 shrink-0" />
+                    <span>{createNewText}</span>
+                  </button>
+                </div>
               )}
             </div>
           </motion.div>

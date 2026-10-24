@@ -53,11 +53,16 @@ Real Windows 11 DWM Mica, not a CSS approximation — CSS has no way to composit
 
 ## 3c. Modals Mica Theme
 
-Every modal dialog in the app follows the Windows 11 dark Mica theme:
-* **Backdrop overlay**: `bg-black/50 backdrop-blur-sm` — dims the window without crushing the desktop Mica wallpaper behind it.
-* **Modal container card**: `bg-card/85 backdrop-blur-xl border border-border/90 shadow-2xl rounded-2xl` — translucent with backdrop filter so the OS Mica effect and subtle desktop shapes softly show through the modal surface.
-* **Header & footer rules**: Subdued hairline divider `border-border/40`.
+Every modal dialog in the app follows the authentic Windows 11 Fluent 2 dark Mica theme:
+* **Backdrop overlay**: `bg-black/65 backdrop-blur-md` — smoothly dims the workspace, darkens background terminal noise, and highlights the modal dialog while preserving desktop ambiance.
+* **Modal container card**: `bg-zinc-950/92 backdrop-blur-3xl border border-white/[0.09] shadow-2xl rounded-2xl` — rich, solid translucent density (~92% dark tint) with 3xl glass diffusion. Prevents terminal background text bleed-through (which previously plagued low-alpha cards) while maintaining a genuine translucent Mica glow.
+* **Header & footer rules**: Subdued hairline divider `border-border/40` or `border-white/[0.07]`.
+* **Universal Consistency**: All modals across the app (`ServerFormModal`, `MacroModal`, `WorkspaceModal`, `KeyVaultView`, `ClosePromptModal`, `ServiceLogViewer`, `ServerDashboard`, `WhatsNewModal`, `LicenseModal`) share the exact same base component (`src/components/ui/modal.tsx`). No component may apply ad-hoc background opacity overrides.
 * **Dismiss interaction**: ESC key listener, backdrop click-to-dismiss, and top-right close icon button.
+* **Animated Dropdowns in Modals**: All dropdowns, selectors, and comboboxes within modals use animated spring components (`AnimatedCombobox` or Radix `Select` with `.t-dropdown`) to maintain consistent dark Mica styling without Win32 OS default popups.
+* **Animated Segmented Controls**: Tab and mode switchers inside modals (such as Authentication Method in `ServerFormModal`, Target Environment in `MacroModal`, or Monitoring cadence) use Framer Motion shared layout pills (`layoutId`, spring duration 0.35, bounce 0.15) with smooth exit/entrance for child options.
+* **Target Environment Execution Safety**: In `MacroModal` and `MacroSidesheet`, execution targets can be dynamically targeted to Active Tab, Local Machine (`PowerShell`, `Command Prompt`, `WSL`), or Specific Server. When a local macro or target is run from a remote SSH server tab, Termizen safely redirects execution to a local terminal instead of running unauthorized commands on the remote server.
+* **Folder Creation in Modals**: Everywhere a folder dropdown appears in a modal dialog (`ServerFormModal`, `MacroModal`, `WorkspaceModal`), users have dual creation pathways: (1) a dedicated "+ New Folder" shortcut text button beside the field label, and (2) a sticky, permanent "+ Create new folder..." action option at the base of the dropdown menu. Both open the dark True Mica `FolderModal` with signature color tagging and automatically select the newly created folder upon save.
 
 ## 4. UI Primitives & Motion Stack
 

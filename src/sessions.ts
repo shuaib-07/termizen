@@ -3,11 +3,11 @@ import type { TerminalSession } from "./Terminal";
 
 const localSessionCache = new Map<string, TerminalSession>();
 
-export function localSession(shell?: string): TerminalSession {
-  const key = shell || "default";
+export function localSession(shell?: string, cwd?: string): TerminalSession {
+  const key = `${shell || "default"}::${cwd || ""}`;
   if (!localSessionCache.has(key)) {
     localSessionCache.set(key, {
-      spawn: (cols, rows) => invoke<number>("pty_spawn", { cols, rows, shell }),
+      spawn: (cols, rows) => invoke<number>("pty_spawn", { cols, rows, shell, cwd }),
       write: (id, data) => invoke("pty_write", { id, data }),
       resize: (id, cols, rows) => invoke("pty_resize", { id, cols, rows }),
       kill: (id) => invoke("pty_kill", { id }),
@@ -338,5 +338,50 @@ export const setCachedWebTraffic = (profileId: number, metrics: import("./types"
 export const appHideToTray = () => invoke<void>("app_hide_to_tray");
 export const appShow = () => invoke<void>("app_show");
 export const appExit = () => invoke<void>("app_exit");
+
+// Macro Groups API
+export const listMacroGroups = () =>
+  invoke<import("./types").MacroGroupSummary[]>("macro_group_list");
+
+export const saveMacroGroup = (params: {
+  name: string;
+  folder?: string;
+  haltOnError: boolean;
+  macroIds: number[];
+}) => invoke<number>("macro_group_save", params);
+
+export const updateMacroGroup = (params: {
+  id: number;
+  name: string;
+  folder?: string;
+  haltOnError: boolean;
+  macroIds: number[];
+}) => invoke<void>("macro_group_update", params);
+
+export const deleteMacroGroup = (id: number) =>
+  invoke<void>("macro_group_delete", { id });
+
+// Workspaces / Terminal Groups API
+export const listWorkspaces = () =>
+  invoke<import("./types").WorkspaceSummary[]>("workspace_list");
+
+export const saveWorkspace = (params: {
+  name: string;
+  folder?: string;
+  layoutMode: "tabs" | "split";
+  terminals: import("./types").WorkspaceTerminalDef[];
+}) => invoke<number>("workspace_save", params);
+
+export const updateWorkspace = (params: {
+  id: number;
+  name: string;
+  folder?: string;
+  layoutMode: "tabs" | "split";
+  terminals: import("./types").WorkspaceTerminalDef[];
+}) => invoke<void>("workspace_update", params);
+
+export const deleteWorkspace = (id: number) =>
+  invoke<void>("workspace_delete", { id });
+
 
 

@@ -3,7 +3,7 @@ use std::sync::Mutex;
 use aes_gcm::aead::{Aead, AeadCore, KeyInit, OsRng};
 use aes_gcm::{Aes256Gcm, Nonce};
 use rusqlite::{params, Connection};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use tauri::{AppHandle, Manager, State};
 use winreg::enums::HKEY_LOCAL_MACHINE;
@@ -105,6 +105,50 @@ impl VaultState {
         let _ = conn.execute("ALTER TABLE macros ADD COLUMN folder TEXT", []);
         // Migration: default shell for local execution (powershell vs cmd)
         let _ = conn.execute("ALTER TABLE macros ADD COLUMN shell TEXT", []);
+
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS macro_groups (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL,
+                folder TEXT,
+                halt_on_error INTEGER NOT NULL DEFAULT 1,
+                created_at TEXT NOT NULL DEFAULT (datetime('now'))
+            )",
+            [],
+        )?;
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS macro_group_items (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                group_id INTEGER NOT NULL REFERENCES macro_groups(id) ON DELETE CASCADE,
+                macro_id INTEGER NOT NULL REFERENCES macros(id) ON DELETE CASCADE,
+                position INTEGER NOT NULL
+            )",
+            [],
+        )?;
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS workspaces (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL,
+                folder TEXT,
+                layout_mode TEXT NOT NULL DEFAULT 'tabs',
+                created_at TEXT NOT NULL DEFAULT (datetime('now'))
+            )",
+            [],
+        )?;
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS workspace_terminals (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                workspace_id INTEGER NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+                position INTEGER NOT NULL,
+                title TEXT NOT NULL,
+                target_kind TEXT NOT NULL DEFAULT 'local',
+                profile_id INTEGER REFERENCES profiles(id) ON DELETE SET NULL,
+                shell TEXT,
+                cwd TEXT,
+                startup_command TEXT
+            )",
+            [],
+        )?;
 
         conn.execute("PRAGMA foreign_keys = ON", [])?;
 
@@ -740,6 +784,262 @@ pub fn load_macro(vault: &VaultState, id: i64) -> Result<(String, bool, Vec<Stri
 #[tauri::command]
 pub fn macro_steps(vault: State<VaultState>, id: i64) -> Result<Vec<String>, String> {
     Ok(load_macro(&vault, id)?.2)
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct MacroGroupSummary {
+    pub id: i64,
+    pub name: String,
+    pub folder: Option<String>,
+    pub halt_on_error: bool,
+    pub macro_ids: Vec<i64>,
+    pub macro_count: usize,
+}
+
+#[tauri::command]
+pub fn macro_group_save(
+    vault: State<VaultState>,
+    name: String,
+    folder: Option<String>,
+    halt_on_error: bool,
+    macro_ids: Vec<i64>,
+) -> Result<i64, String> {
+    let mut conn = vault.conn.lock().unwrap();
+    let tx = conn.transaction().map_err(|e| e.to_string())?;
+    tx.execute(
+        "INSERT INTO macro_groups (name, folder, halt_on_error) VALUES (?1, ?2, ?3)",
+        params![name, folder, halt_on_error],
+    )
+    .map_err(|e| e.to_string())?;
+    let group_id = tx.last_insert_rowid();
+    for (i, m_id) in macro_ids.iter().enumerate() {
+        tx.execute(
+            "INSERT INTO macro_group_items (group_id, macro_id, position) VALUES (?1, ?2, ?3)",
+            params![group_id, m_id, i as i64],
+        )
+        .map_err(|e| e.to_string())?;
+    }
+    tx.commit().map_err(|e| e.to_string())?;
+    Ok(group_id)
+}
+
+#[tauri::command]
+pub fn macro_group_update(
+    vault: State<VaultState>,
+    id: i64,
+    name: String,
+    folder: Option<String>,
+    halt_on_error: bool,
+    macro_ids: Vec<i64>,
+) -> Result<(), String> {
+    let mut conn = vault.conn.lock().unwrap();
+    let tx = conn.transaction().map_err(|e| e.to_string())?;
+    tx.execute(
+        "UPDATE macro_groups SET name = ?1, folder = ?2, halt_on_error = ?3 WHERE id = ?4",
+        params![name, folder, halt_on_error, id],
+    )
+    .map_err(|e| e.to_string())?;
+    tx.execute("DELETE FROM macro_group_items WHERE group_id = ?1", params![id]).map_err(|e| e.to_string())?;
+    for (i, m_id) in macro_ids.iter().enumerate() {
+        tx.execute(
+            "INSERT INTO macro_group_items (group_id, macro_id, position) VALUES (?1, ?2, ?3)",
+            params![id, m_id, i as i64],
+        )
+        .map_err(|e| e.to_string())?;
+    }
+    tx.commit().map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn macro_group_delete(vault: State<VaultState>, id: i64) -> Result<(), String> {
+    let conn = vault.conn.lock().unwrap();
+    conn.execute("DELETE FROM macro_groups WHERE id = ?1", params![id])
+        .map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+#[tauri::command]
+pub fn macro_group_list(vault: State<VaultState>) -> Result<Vec<MacroGroupSummary>, String> {
+    let conn = vault.conn.lock().unwrap();
+    let mut stmt = conn
+        .prepare("SELECT id, name, folder, halt_on_error FROM macro_groups ORDER BY name")
+        .map_err(|e| e.to_string())?;
+    let groups = stmt
+        .query_map([], |row| {
+            Ok((
+                row.get::<_, i64>(0)?,
+                row.get::<_, String>(1)?,
+                row.get::<_, Option<String>>(2)?,
+                row.get::<_, i64>(3)? != 0,
+            ))
+        })
+        .map_err(|e| e.to_string())?
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|e| e.to_string())?;
+
+    let mut result = Vec::new();
+    for (id, name, folder, halt_on_error) in groups {
+        let mut item_stmt = conn
+            .prepare("SELECT macro_id FROM macro_group_items WHERE group_id = ?1 ORDER BY position")
+            .map_err(|e| e.to_string())?;
+        let macro_ids = item_stmt
+            .query_map(params![id], |row| row.get::<_, i64>(0))
+            .map_err(|e| e.to_string())?
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(|e| e.to_string())?;
+        let count = macro_ids.len();
+        result.push(MacroGroupSummary {
+            id,
+            name,
+            folder,
+            halt_on_error,
+            macro_ids,
+            macro_count: count,
+        });
+    }
+    Ok(result)
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct WorkspaceTerminalDef {
+    pub id: Option<i64>,
+    pub position: i64,
+    pub title: String,
+    pub target_kind: String,
+    pub profile_id: Option<i64>,
+    pub shell: Option<String>,
+    pub cwd: Option<String>,
+    pub startup_command: Option<String>,
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct WorkspaceSummary {
+    pub id: i64,
+    pub name: String,
+    pub folder: Option<String>,
+    pub layout_mode: String,
+    pub terminals: Vec<WorkspaceTerminalDef>,
+}
+
+#[tauri::command]
+pub fn workspace_save(
+    vault: State<VaultState>,
+    name: String,
+    folder: Option<String>,
+    layout_mode: String,
+    terminals: Vec<WorkspaceTerminalDef>,
+) -> Result<i64, String> {
+    let mut conn = vault.conn.lock().unwrap();
+    let tx = conn.transaction().map_err(|e| e.to_string())?;
+    tx.execute(
+        "INSERT INTO workspaces (name, folder, layout_mode) VALUES (?1, ?2, ?3)",
+        params![name, folder, layout_mode],
+    )
+    .map_err(|e| e.to_string())?;
+    let ws_id = tx.last_insert_rowid();
+    for (i, t) in terminals.iter().enumerate() {
+        tx.execute(
+            "INSERT INTO workspace_terminals (workspace_id, position, title, target_kind, profile_id, shell, cwd, startup_command)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+            params![ws_id, i as i64, t.title, t.target_kind, t.profile_id, t.shell, t.cwd, t.startup_command],
+        )
+        .map_err(|e| e.to_string())?;
+    }
+    tx.commit().map_err(|e| e.to_string())?;
+    Ok(ws_id)
+}
+
+#[tauri::command]
+pub fn workspace_update(
+    vault: State<VaultState>,
+    id: i64,
+    name: String,
+    folder: Option<String>,
+    layout_mode: String,
+    terminals: Vec<WorkspaceTerminalDef>,
+) -> Result<(), String> {
+    let mut conn = vault.conn.lock().unwrap();
+    let tx = conn.transaction().map_err(|e| e.to_string())?;
+    tx.execute(
+        "UPDATE workspaces SET name = ?1, folder = ?2, layout_mode = ?3 WHERE id = ?4",
+        params![name, folder, layout_mode, id],
+    )
+    .map_err(|e| e.to_string())?;
+    tx.execute("DELETE FROM workspace_terminals WHERE workspace_id = ?1", params![id]).map_err(|e| e.to_string())?;
+    for (i, t) in terminals.iter().enumerate() {
+        tx.execute(
+            "INSERT INTO workspace_terminals (workspace_id, position, title, target_kind, profile_id, shell, cwd, startup_command)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+            params![id, i as i64, t.title, t.target_kind, t.profile_id, t.shell, t.cwd, t.startup_command],
+        )
+        .map_err(|e| e.to_string())?;
+    }
+    tx.commit().map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn workspace_delete(vault: State<VaultState>, id: i64) -> Result<(), String> {
+    let conn = vault.conn.lock().unwrap();
+    conn.execute("DELETE FROM workspaces WHERE id = ?1", params![id])
+        .map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+#[tauri::command]
+pub fn workspace_list(vault: State<VaultState>) -> Result<Vec<WorkspaceSummary>, String> {
+    let conn = vault.conn.lock().unwrap();
+    let mut stmt = conn
+        .prepare("SELECT id, name, folder, layout_mode FROM workspaces ORDER BY name")
+        .map_err(|e| e.to_string())?;
+    let workspaces = stmt
+        .query_map([], |row| {
+            Ok((
+                row.get::<_, i64>(0)?,
+                row.get::<_, String>(1)?,
+                row.get::<_, Option<String>>(2)?,
+                row.get::<_, String>(3)?,
+            ))
+        })
+        .map_err(|e| e.to_string())?
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|e| e.to_string())?;
+
+    let mut result = Vec::new();
+    for (id, name, folder, layout_mode) in workspaces {
+        let mut t_stmt = conn
+            .prepare(
+                "SELECT id, position, title, target_kind, profile_id, shell, cwd, startup_command
+                 FROM workspace_terminals WHERE workspace_id = ?1 ORDER BY position",
+            )
+            .map_err(|e| e.to_string())?;
+        let terminals = t_stmt
+            .query_map(params![id], |row| {
+                Ok(WorkspaceTerminalDef {
+                    id: Some(row.get(0)?),
+                    position: row.get(1)?,
+                    title: row.get(2)?,
+                    target_kind: row.get(3)?,
+                    profile_id: row.get(4)?,
+                    shell: row.get(5)?,
+                    cwd: row.get(6)?,
+                    startup_command: row.get(7)?,
+                })
+            })
+            .map_err(|e| e.to_string())?
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(|e| e.to_string())?;
+        result.push(WorkspaceSummary {
+            id,
+            name,
+            folder,
+            layout_mode,
+            terminals,
+        });
+    }
+    Ok(result)
 }
 
 

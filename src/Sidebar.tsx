@@ -1,12 +1,13 @@
 import { useId, useState } from "react";
 import { motion, MotionConfig } from "framer-motion";
-import { FolderPlus, Info, Key, LayoutDashboard, Server, Settings, Terminal, Zap } from "lucide-react";
+import { FolderPlus, Info, Key, Layers, LayoutDashboard, Server, Settings, Terminal, Zap } from "lucide-react";
 import { BloomMenu, type BloomMenuItem } from "@/components/ui/bloom-menu";
 import { FolderModal } from "@/components/folders/FolderModal";
 import { addEmptyFolder, getEmptyFolders } from "@/lib/folderMetadata";
 import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import logo from "@/assets/logo.png";
+import { APP_VERSION } from "@/lib/updater";
 import ProfileSidebar from "./ProfileSidebar";
 import MacrosPanel from "./MacrosPanel";
 import type { MacroSummary, ProfileSummary } from "./sessions";
@@ -31,13 +32,17 @@ export default function Sidebar({
   onNewTab,
   onOpenKeyVault,
   onRefresh,
+  workspaceCount = 0,
+  onOpenNewTab,
+  onOpenMacroSidesheet,
+  onNewWorkspace,
 }: {
   activeNav: SidebarViewMode;
   onSelectNav: (nav: SidebarViewMode) => void;
   profiles: ProfileSummary[];
   macros: MacroSummary[];
   hasUpdate?: boolean;
-  onOpenProfile: (profile: ProfileSummary, subView?: ServerHubSubView) => void;
+  onOpenProfile: (profile: ProfileSummary, subView?: ServerHubSubView, forceNewTab?: boolean) => void;
   onEditProfile: (profile: ProfileSummary) => void;
   onDeleteProfile: (id: number) => void;
   onRunMacro: (macroIdOrProfileId: number, macroIdOrOptions?: number | { profileId?: number; shell?: string }) => void;
@@ -50,6 +55,10 @@ export default function Sidebar({
   onNewTab?: () => void;
   onOpenKeyVault?: () => void;
   onRefresh?: () => void;
+  workspaceCount?: number;
+  onOpenNewTab?: (profile: ProfileSummary) => void;
+  onOpenMacroSidesheet?: (profileId?: number) => void;
+  onNewWorkspace?: () => void;
 }) {
   const pillLayoutId = useId();
   const [newFolderModalOpen, setNewFolderModalOpen] = useState(false);
@@ -57,6 +66,7 @@ export default function Sidebar({
   const NAV_ITEMS: { id: SidebarViewMode; label: string; icon: any; count?: number }[] = [
     { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
     { id: "servers", label: "Servers", icon: Server, count: profiles.length },
+    { id: "workspaces", label: "Workspaces", icon: Layers, count: workspaceCount },
     { id: "macros", label: "Macros", icon: Zap, count: macros.length },
     { id: "keys", label: "Key Vault", icon: Key },
   ];
@@ -70,6 +80,13 @@ export default function Sidebar({
       onClick: onAddServer,
     },
     {
+      id: "new-workspace",
+      label: "New Workspace",
+      description: "Multi-terminal stack",
+      icon: Layers,
+      onClick: onNewWorkspace ? onNewWorkspace : () => onSelectNav("workspaces"),
+    },
+    {
       id: "new-macro",
       label: "Create Macro",
       description: "Automate commands",
@@ -81,7 +98,7 @@ export default function Sidebar({
       label: "New Terminal",
       description: "Local / split session",
       icon: Terminal,
-      onClick: onNewTab,
+      onClick: () => onNewTab?.(),
     },
     {
       id: "key-vault",
@@ -102,7 +119,7 @@ export default function Sidebar({
             <span className="font-bold text-sm tracking-tight text-foreground">Termizen</span>
           </div>
           <span className="rounded bg-muted/60 px-1.5 py-0.2 text-[10px] font-mono text-muted-foreground">
-            v0.1.0
+            v{APP_VERSION}
           </span>
         </div>
 
@@ -168,6 +185,8 @@ export default function Sidebar({
                 profiles={profiles}
                 macros={macros}
                 onOpen={onOpenProfile}
+                onOpenNewTab={onOpenNewTab}
+                onOpenMacroSidesheet={onOpenMacroSidesheet}
                 onEditProfile={onEditProfile}
                 onDelete={onDeleteProfile}
                 onRunMacro={onRunMacro}

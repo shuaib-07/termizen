@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { Activity, Check, Folder, Info, Server, Sparkles, Upload } from "lucide-react";
+import { Activity, Check, Folder, Info, Plus, Server, Sparkles, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { PasswordInput } from "@/components/ui/password-input";
@@ -12,6 +12,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { SPRING_PANEL } from "@/lib/ease";
 import { getFolderColor, getEmptyFolders, addEmptyFolder } from "@/lib/folderMetadata";
 import { cn } from "@/lib/utils";
+import { FolderModal } from "@/components/folders/FolderModal";
 import { listKeys, saveKey, saveProfile, updateProfile, setProfileBgMonitoring, getProfilePassword } from "@/sessions";
 import type { KeySummary, ProfileSummary, SaveProfileParams } from "@/types";
 
@@ -33,6 +34,7 @@ export default function ServerFormModal({
   const [port, setPort] = useState(22);
   const [username, setUsername] = useState("root");
   const [folder, setFolder] = useState("");
+  const [newFolderModalOpen, setNewFolderModalOpen] = useState(false);
   const [authMethod, setAuthMethod] = useState<"password" | "key">("password");
   const [password, setPassword] = useState("");
   const [bgMonitoring, setBgMonitoring] = useState(false);
@@ -262,7 +264,17 @@ export default function ServerFormModal({
           </div>
 
           <div className="col-span-2 sm:col-span-1">
-            <label className="text-xs font-medium text-muted-foreground">Folder (Optional)</label>
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-medium text-muted-foreground">Folder (Optional)</label>
+              <button
+                type="button"
+                onClick={() => setNewFolderModalOpen(true)}
+                className="text-[11px] text-primary hover:underline flex items-center gap-1 cursor-pointer font-medium"
+              >
+                <Plus className="h-3 w-3" />
+                <span>New Folder</span>
+              </button>
+            </div>
             <div className="mt-1">
               <AnimatedCombobox
                 value={folder}
@@ -280,6 +292,8 @@ export default function ServerFormModal({
                 clearLabel="No Folder (Root)"
                 clearValue=""
                 icon={<Folder className="h-3.5 w-3.5" />}
+                onCreateNew={() => setNewFolderModalOpen(true)}
+                createNewText="+ Create new folder..."
               />
             </div>
           </div>
@@ -289,161 +303,207 @@ export default function ServerFormModal({
         <div className="space-y-3 pt-2 border-t border-border/40">
           <div className="flex items-center justify-between">
             <label className="text-xs font-medium text-foreground">Authentication Method</label>
-            <div className="flex items-center rounded-lg bg-secondary/80 p-0.5 border border-border/60">
-              <button
-                type="button"
-                className={`px-3 py-1 text-xs rounded-md font-medium transition-all ${
-                  authMethod === "password"
-                    ? "bg-background text-foreground shadow-xs"
-                    : "text-muted-foreground hover:text-foreground"
-                }`}
-                onClick={() => setAuthMethod("password")}
-              >
-                Password
-              </button>
-              <button
-                type="button"
-                className={`px-3 py-1 text-xs rounded-md font-medium transition-all ${
-                  authMethod === "key"
-                    ? "bg-background text-foreground shadow-xs"
-                    : "text-muted-foreground hover:text-foreground"
-                }`}
-                onClick={() => setAuthMethod("key")}
-              >
-                SSH Key
-              </button>
+            <div className="relative flex items-center rounded-lg bg-zinc-900/80 p-0.5 border border-white/[0.08]">
+              {(
+                [
+                  { id: "password", label: "Password" },
+                  { id: "key", label: "SSH Key" },
+                ] as const
+              ).map((tab) => {
+                const isSelected = authMethod === tab.id;
+                return (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    onClick={() => setAuthMethod(tab.id)}
+                    className={cn(
+                      "relative z-10 px-3 py-1 text-xs rounded-md font-medium transition-colors cursor-pointer",
+                      isSelected
+                        ? "text-foreground font-semibold"
+                        : "text-muted-foreground hover:text-foreground"
+                    )}
+                  >
+                    {isSelected && (
+                      <motion.div
+                        layoutId="server-auth-method-pill"
+                        className="absolute inset-0 z-[-1] rounded-md border border-border bg-background shadow-xs"
+                        transition={{ type: "spring", duration: 0.35, bounce: 0.15 }}
+                      />
+                    )}
+                    <span>{tab.label}</span>
+                  </button>
+                );
+              })}
             </div>
           </div>
 
-          {authMethod === "password" ? (
-            <div>
-              <div className="flex items-center justify-between">
-                <label className="text-xs font-medium text-muted-foreground">Password</label>
-                {editingProfile && (
-                  <span className="text-[10px] text-muted-foreground/70">
-                    Saved in vault • Edit or leave as is
-                  </span>
+          <AnimatePresence mode="wait" initial={false}>
+            {authMethod === "password" ? (
+              <motion.div
+                key="auth-password"
+                initial={{ opacity: 0, y: 4 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -4 }}
+                transition={{ duration: 0.16, ease: "easeOut" }}
+              >
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-medium text-muted-foreground">Password</label>
+                  {editingProfile && (
+                    <span className="text-[10px] text-muted-foreground/70">
+                      Saved in vault • Edit or leave as is
+                    </span>
+                  )}
+                </div>
+                <PasswordInput
+                  placeholder={editingProfile ? "•••••••• (Leave blank to keep saved password)" : "Enter SSH password"}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="mt-1 text-xs"
+                  required={!editingProfile}
+                />
+              </motion.div>
+            ) : (
+              <motion.div
+                key="auth-key"
+                initial={{ opacity: 0, y: 4 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -4 }}
+                transition={{ duration: 0.16, ease: "easeOut" }}
+                className="space-y-3"
+              >
+                {vaultKeys.length > 0 && (
+                  <div className="relative flex items-center rounded-lg bg-zinc-900/80 p-0.5 border border-white/[0.08] w-fit">
+                    {(
+                      [
+                        { id: "vault", label: `Select from Key Vault (${vaultKeys.length})` },
+                        { id: "new", label: "+ Add New Key" },
+                      ] as const
+                    ).map((tab) => {
+                      const isSelected = keySource === tab.id;
+                      return (
+                        <button
+                          key={tab.id}
+                          type="button"
+                          onClick={() => setKeySource(tab.id)}
+                          className={cn(
+                            "relative z-10 text-xs px-2.5 py-1 rounded-md font-medium transition-colors cursor-pointer",
+                            isSelected
+                              ? "text-primary font-semibold"
+                              : "text-muted-foreground hover:text-foreground"
+                          )}
+                        >
+                          {isSelected && (
+                            <motion.div
+                              layoutId="server-key-source-pill"
+                              className="absolute inset-0 z-[-1] rounded-md border border-primary/40 bg-primary/10 shadow-xs"
+                              transition={{ type: "spring", duration: 0.35, bounce: 0.15 }}
+                            />
+                          )}
+                          <span>{tab.label}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
                 )}
-              </div>
-              <PasswordInput
-                placeholder={editingProfile ? "•••••••• (Leave blank to keep saved password)" : "Enter SSH password"}
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="mt-1 text-xs"
-                required={!editingProfile}
-              />
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {vaultKeys.length > 0 && (
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    className={`text-xs px-2.5 py-1 rounded-md border transition-colors ${
-                      keySource === "vault"
-                        ? "bg-primary/10 border-primary text-primary font-medium"
-                        : "border-border text-muted-foreground hover:text-foreground"
-                    }`}
-                    onClick={() => setKeySource("vault")}
-                  >
-                    Select from Key Vault ({vaultKeys.length})
-                  </button>
-                  <button
-                    type="button"
-                    className={`text-xs px-2.5 py-1 rounded-md border transition-colors ${
-                      keySource === "new"
-                        ? "bg-primary/10 border-primary text-primary font-medium"
-                        : "border-border text-muted-foreground hover:text-foreground"
-                    }`}
-                    onClick={() => setKeySource("new")}
-                  >
-                    + Add New Key
-                  </button>
-                </div>
-              )}
 
-              {keySource === "vault" && vaultKeys.length > 0 ? (
-                <div>
-                  <label className="text-xs font-medium text-muted-foreground">Select Private Key</label>
-                  <Select
-                    value={selectedKeyId ? String(selectedKeyId) : undefined}
-                    onValueChange={(val) => setSelectedKeyId(Number(val))}
-                  >
-                    <SelectTrigger className="mt-1 text-xs">
-                      <SelectValue placeholder="Choose a key from Vault" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {vaultKeys.map((k) => (
-                        <SelectItem key={k.id} value={String(k.id)}>
-                          {k.name} ({k.comment || "SSH Key"})
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              ) : (
-                <div className="space-y-3 rounded-lg border border-border/80 bg-background/50 p-3">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-semibold text-foreground">New Private Key</span>
-                    <label className="cursor-pointer text-xs text-primary hover:underline flex items-center gap-1">
-                      <Upload className="h-3 w-3" />
-                      Upload File
-                      <input type="file" className="hidden" onChange={handleFileUpload} />
-                    </label>
-                  </div>
+                <AnimatePresence mode="wait" initial={false}>
+                  {keySource === "vault" && vaultKeys.length > 0 ? (
+                    <motion.div
+                      key="key-vault"
+                      initial={{ opacity: 0, y: 3 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -3 }}
+                      transition={{ duration: 0.15, ease: "easeOut" }}
+                    >
+                      <label className="text-xs font-medium text-muted-foreground">Select Private Key</label>
+                      <Select
+                        value={selectedKeyId ? String(selectedKeyId) : undefined}
+                        onValueChange={(val) => setSelectedKeyId(Number(val))}
+                      >
+                        <SelectTrigger className="mt-1 text-xs">
+                          <SelectValue placeholder="Choose a key from Vault" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {vaultKeys.map((k) => (
+                            <SelectItem key={k.id} value={String(k.id)}>
+                              {k.name} ({k.comment || "SSH Key"})
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </motion.div>
+                  ) : (
+                    <motion.div
+                      key="key-new"
+                      initial={{ opacity: 0, y: 3 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -3 }}
+                      transition={{ duration: 0.15, ease: "easeOut" }}
+                      className="space-y-3 rounded-lg border border-border/80 bg-background/50 p-3"
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-semibold text-foreground">New Private Key</span>
+                        <label className="cursor-pointer text-xs text-primary hover:underline flex items-center gap-1">
+                          <Upload className="h-3 w-3" />
+                          Upload File
+                          <input type="file" className="hidden" onChange={handleFileUpload} />
+                        </label>
+                      </div>
 
-                  <div>
-                    <label className="text-[11px] text-muted-foreground">Key Name</label>
-                    <Input
-                      placeholder="e.g. AWS Production RSA Key"
-                      value={newKeyName}
-                      onChange={(e) => setNewKeyName(e.target.value)}
-                      className="mt-0.5 text-xs h-7"
-                    />
-                  </div>
+                      <div>
+                        <label className="text-[11px] text-muted-foreground">Key Name</label>
+                        <Input
+                          placeholder="e.g. AWS Production RSA Key"
+                          value={newKeyName}
+                          onChange={(e) => setNewKeyName(e.target.value)}
+                          className="mt-0.5 text-xs h-7"
+                        />
+                      </div>
 
-                  <div>
-                    <label className="text-[11px] text-muted-foreground">Private Key Data</label>
-                    <textarea
-                      placeholder="-----BEGIN OPENSSH PRIVATE KEY-----&#10;...&#10;-----END OPENSSH PRIVATE KEY-----"
-                      value={newKeyData}
-                      onChange={(e) => setNewKeyData(e.target.value)}
-                      className="mt-0.5 w-full rounded-md border border-input bg-transparent px-2 py-1.5 font-mono text-[11px] placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring min-h-[90px]"
-                      rows={4}
-                      required
-                    />
-                  </div>
+                      <div>
+                        <label className="text-[11px] text-muted-foreground">Private Key Data</label>
+                        <textarea
+                          placeholder="-----BEGIN OPENSSH PRIVATE KEY-----&#10;...&#10;-----END OPENSSH PRIVATE KEY-----"
+                          value={newKeyData}
+                          onChange={(e) => setNewKeyData(e.target.value)}
+                          className="mt-0.5 w-full rounded-md border border-input bg-transparent px-2 py-1.5 font-mono text-[11px] placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring min-h-[90px]"
+                          rows={4}
+                          required
+                        />
+                      </div>
 
-                  <div className="grid grid-cols-2 gap-2">
-                    <div>
-                      <label className="text-[11px] text-muted-foreground">Comment (Optional)</label>
-                      <Input
-                        placeholder="e.g. Production Ed25519"
-                        className="mt-0.5 text-xs h-7"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-[11px] text-muted-foreground">Passphrase (if any)</label>
-                      <PasswordInput
-                        placeholder="Optional passphrase"
-                        value={newKeyPassphrase}
-                        onChange={(e) => setNewKeyPassphrase(e.target.value)}
-                        className="mt-0.5 text-xs h-7"
-                      />
-                    </div>
-                  </div>
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <label className="text-[11px] text-muted-foreground">Comment (Optional)</label>
+                          <Input
+                            placeholder="e.g. Production Ed25519"
+                            className="mt-0.5 text-xs h-7"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-[11px] text-muted-foreground">Passphrase (if any)</label>
+                          <PasswordInput
+                            placeholder="Optional passphrase"
+                            value={newKeyPassphrase}
+                            onChange={(e) => setNewKeyPassphrase(e.target.value)}
+                            className="mt-0.5 text-xs h-7"
+                          />
+                        </div>
+                      </div>
 
-                  <div className="pt-1">
-                    <Checkbox
-                      checked={saveToVault}
-                      onCheckedChange={setSaveToVault}
-                      label="Save this key to Key Vault for reuse"
-                    />
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
+                      <div className="pt-1">
+                        <Checkbox
+                          checked={saveToVault}
+                          onCheckedChange={setSaveToVault}
+                          label="Save this key to Key Vault for reuse"
+                        />
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
 
         {/* Monitoring Mode Section */}
@@ -529,20 +589,27 @@ export default function ServerFormModal({
                 setBgMonitoring(false);
               }}
               className={cn(
-                "flex flex-col items-start gap-1 p-2.5 rounded-xl border text-left transition-all cursor-pointer relative",
+                "flex flex-col items-start gap-1 p-2.5 rounded-xl border text-left transition-colors cursor-pointer relative",
                 !bgMonitoring
-                  ? "border-primary/60 bg-primary/10 shadow-xs ring-1 ring-primary/40 text-foreground"
+                  ? "border-primary/60 text-foreground"
                   : "border-border/60 bg-card/60 hover:bg-card/90 text-muted-foreground hover:text-foreground"
               )}
             >
-              <div className="flex items-center justify-between w-full">
+              {!bgMonitoring && (
+                <motion.div
+                  layoutId="monitoring-mode-pill"
+                  className="absolute inset-0 z-0 rounded-xl border border-primary/60 bg-primary/10 shadow-xs ring-1 ring-primary/40 pointer-events-none"
+                  transition={{ type: "spring", duration: 0.35, bounce: 0.15 }}
+                />
+              )}
+              <div className="relative z-10 flex items-center justify-between w-full">
                 <div className="flex items-center gap-1.5 font-medium text-xs text-foreground">
                   <Sparkles className="h-3.5 w-3.5 text-sky-400" />
                   Smart Monitoring
                 </div>
                 {!bgMonitoring && <Check className="h-3.5 w-3.5 text-primary shrink-0" />}
               </div>
-              <span className="text-[10px] text-muted-foreground leading-snug">
+              <span className="relative z-10 text-[10px] text-muted-foreground leading-snug">
                 Instant 0ms cache • On-demand • Battery friendly
               </span>
             </button>
@@ -560,22 +627,29 @@ export default function ServerFormModal({
               }}
               disabled={is24x7LimitReached && !bgMonitoring}
               className={cn(
-                "flex flex-col items-start gap-1 p-2.5 rounded-xl border text-left transition-all cursor-pointer relative",
+                "flex flex-col items-start gap-1 p-2.5 rounded-xl border text-left transition-colors cursor-pointer relative",
                 bgMonitoring
-                  ? "border-emerald-500/60 bg-emerald-500/10 shadow-xs ring-1 ring-emerald-500/40 text-foreground"
+                  ? "border-emerald-500/60 text-foreground"
                   : is24x7LimitReached
                   ? "opacity-50 border-border/40 bg-card/30 cursor-not-allowed text-muted-foreground"
                   : "border-border/60 bg-card/60 hover:bg-card/90 text-muted-foreground hover:text-foreground"
               )}
             >
-              <div className="flex items-center justify-between w-full">
+              {bgMonitoring && (
+                <motion.div
+                  layoutId="monitoring-mode-pill"
+                  className="absolute inset-0 z-0 rounded-xl border border-emerald-500/60 bg-emerald-500/10 shadow-xs ring-1 ring-emerald-500/40 pointer-events-none"
+                  transition={{ type: "spring", duration: 0.35, bounce: 0.15 }}
+                />
+              )}
+              <div className="relative z-10 flex items-center justify-between w-full">
                 <div className="flex items-center gap-1.5 font-medium text-xs text-foreground">
                   <Activity className={cn("h-3.5 w-3.5", bgMonitoring ? "text-emerald-400 animate-pulse" : "text-muted-foreground")} />
                   24/7 Continuous
                 </div>
                 {bgMonitoring && <Check className="h-3.5 w-3.5 text-emerald-400 shrink-0" />}
               </div>
-              <span className="text-[10px] text-muted-foreground leading-snug">
+              <span className="relative z-10 text-[10px] text-muted-foreground leading-snug">
                 {is24x7LimitReached && !bgMonitoring
                   ? "Cap reached (5/5 active)"
                   : "Live polling in background • Max 5 servers"}
@@ -599,6 +673,18 @@ export default function ServerFormModal({
           </Button>
         </div>
       </form>
+
+      {/* Create New Folder Modal */}
+      <FolderModal
+        isOpen={newFolderModalOpen}
+        onClose={() => setNewFolderModalOpen(false)}
+        existingFolders={existingFolders}
+        onSave={async (_, newName, color) => {
+          addEmptyFolder(newName, color);
+          setFolder(newName);
+          setNewFolderModalOpen(false);
+        }}
+      />
     </Modal>
   );
 }

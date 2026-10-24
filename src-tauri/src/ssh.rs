@@ -75,7 +75,12 @@ pub async fn authenticate(
     key_data: Option<String>,
     passphrase: Option<String>,
 ) -> Result<Handle<SshClientHandler>, String> {
-    let config = Arc::new(client::Config::default());
+    let mut config = client::Config::default();
+    // Native SSH keepalive: sends keepalive message every 20s if no data received;
+    // drops dead session after 3 missed replies (60s total)
+    config.keepalive_interval = Some(std::time::Duration::from_secs(20));
+    config.keepalive_max = 3;
+    let config = Arc::new(config);
     let mut handle = tokio::time::timeout(
         std::time::Duration::from_secs(20),
         client::connect(config, (host, port), SshClientHandler),

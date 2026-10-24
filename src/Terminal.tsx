@@ -22,19 +22,15 @@ export interface TerminalSession {
 }
 
 export interface TerminalHandle {
-  // PTY-mode macro runner: types each command into this live session with an
-  // injected exit-code marker, same transport the user's own typing uses.
-  // See plan.md §3.2 -- fragile if the shell isn't at a plain prompt when a
-  // step fires (mid-vim/su/docker exec); the timeout below turns a stalled
-  // marker into a halted macro instead of hanging forever.
   runMacro: (
     steps: string[],
     haltOnError: boolean,
     onStep?: (index: number, exitCode: number | null) => void
-  ) => Promise<void>;
+  ) => Promise<boolean>;
+  abortMacro: () => void;
 }
 
-const MARKER_TIMEOUT_MS = 600000; // 10 minutes max per step
+const MARKER_TIMEOUT_MS = 300000; // 5 minutes max per step
 
 export type TerminalStatus = "connecting" | "connected" | "error";
 
@@ -81,13 +77,24 @@ const Terminal = forwardRef<
       setRetryTrigger((c) => c + 1);
     };
 
+    const macroAbortedRef = useRef(false);
+
     useImperativeHandle(
       ref,
       () => ({
         async runMacro(steps, haltOnError, onStep) {
+          macroAbortedRef.current = false;
           for (let i = 0; i < steps.length; i++) {
+            if (macroAbortedRef.current) {
+              termRef.current?.writeln(`\r\n\x1b[33m[Termizen] Macro canceled by user.\x1b[0m\r\n`);
+              return false;
+            }
             const id = sessionIdRef.current;
             if (id === null) throw new Error("session not connected");
+
+            // Pre-clear dirty line: send interrupt pulse \x03 followed by \r so unfinished prompt text doesn't swallow command
+            await session.write(id, "\x03\r");
+            await new Promise((r) => setTimeout(r, 60));
 
             const exitCode = await new Promise<number | null>((resolve) => {
               let overallTimer: any = null;
@@ -108,7 +115,7 @@ const Terminal = forwardRef<
 
               const resetInactivity = () => {
                 clearTimeout(inactivityTimer);
-                inactivityTimer = setTimeout(handleTimeout, 180000); // 3 minutes of zero output
+                inactivityTimer = setTimeout(handleTimeout, 60000); // 60s of zero output
               };
 
               overallTimer = setTimeout(handleTimeout, MARKER_TIMEOUT_MS);
@@ -122,6 +129,11 @@ const Terminal = forwardRef<
               void session.write(id, `${steps[i]}; echo TERMINA_EXIT:$?\r`);
             });
 
+            if (macroAbortedRef.current) {
+              termRef.current?.writeln(`\r\n\x1b[33m[Termizen] Macro canceled by user.\x1b[0m\r\n`);
+              return false;
+            }
+
             onStep?.(i, exitCode);
             if (haltOnError && exitCode !== 0) {
               termRef.current?.writeln(
@@ -129,8 +141,15 @@ const Terminal = forwardRef<
                   exitCode === null ? "timed out after inactivity" : `exit code ${exitCode}`
                 }\x1b[0m\r\n`
               );
-              break;
+              return false;
             }
+          }
+          return true;
+        },
+        abortMacro() {
+          macroAbortedRef.current = true;
+          if (pendingMarkerRef.current) {
+            pendingMarkerRef.current(null);
           }
         },
       }),

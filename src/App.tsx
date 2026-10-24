@@ -10,11 +10,16 @@ import SettingsView, { applyTheme, getStoredAccent, getStoredTheme } from "./com
 import AboutView from "./components/about/AboutView";
 import { checkAppUpdates, getAutoCheckUpdates, type UpdateInfo } from "./lib/updater";
 import ServerFormModal from "./components/servers/ServerFormModal";
+import { MacroModal } from "./components/macros/MacroModal";
 import { ClosePromptModal } from "@/components/ui/ClosePromptModal";
 import { getStoredCloseBehavior } from "@/lib/closeSettings";
 import { Loader } from "@/components/Loader";
 import { ToastProvider, useToast } from "@/components/ui/animated-toast-stack";
 import { cn } from "@/lib/utils";
+import WorkspacesView from "./components/workspaces/WorkspacesView";
+import WorkspaceModal from "./components/workspaces/WorkspaceModal";
+import MacroSidesheet from "./components/macros/MacroSidesheet";
+import type { TerminalHandle } from "./Terminal";
 import {
   deleteProfile,
   deleteMacro,
@@ -30,9 +35,16 @@ import {
   updateMacro,
   appHideToTray,
   appExit,
+  listMacroGroups,
+  saveMacroGroup,
+  deleteMacroGroup,
+  listWorkspaces,
+  saveWorkspace,
+  updateWorkspace,
+  deleteWorkspace,
 } from "./sessions";
 import type { MacroSummary, ProfileSummary, SaveMacroParams } from "./sessions";
-import type { Pane, PaneLayout, ServerHubSubView, SidebarViewMode, Tab } from "./types";
+import type { MacroGroupSummary, Pane, PaneLayout, ServerHubSubView, SidebarViewMode, Tab, TabContentState, WorkspaceSummary, WorkspaceTerminalDef } from "./types";
 
 let nextId = 1;
 const genId = (prefix: string) => `${prefix}-${nextId++}`;
@@ -106,8 +118,32 @@ function AppContent() {
   const [showServerModal, setShowServerModal] = useState(false);
   const [editingProfile, setEditingProfile] = useState<ProfileSummary | null>(null);
 
+  // Macro Modal
+  const [showMacroModal, setShowMacroModal] = useState(false);
+  const [editingMacroId, setEditingMacroId] = useState<number | null>(null);
+  const [macroModalDefaultFolder, setMacroModalDefaultFolder] = useState<string | undefined>(undefined);
+
+  // Workspace Modal
+  const [showWorkspaceModal, setShowWorkspaceModal] = useState(false);
+  const [editingWorkspace, setEditingWorkspace] = useState<WorkspaceSummary | null>(null);
+
+  const [workspaces, setWorkspaces] = useState<WorkspaceSummary[]>([]);
+  const [macroGroups, setMacroGroups] = useState<MacroGroupSummary[]>([]);
+
+  // Macro Sidesheet state
+  const [macroSidesheetOpen, setMacroSidesheetOpen] = useState(false);
+  const [macroSidesheetProfileId, setMacroSidesheetProfileId] = useState<number | undefined>(undefined);
+  const [macroSidesheetBoundTerminal, setMacroSidesheetBoundTerminal] = useState<React.RefObject<TerminalHandle | null> | null>(null);
+  const [macroSidesheetRunningState, setMacroSidesheetRunningState] = useState<{
+    isRunning: boolean;
+    label?: string;
+    onCancel?: () => void;
+  }>({ isRunning: false });
+
   const refreshProfiles = () => listProfiles().then(setProfiles);
   const refreshMacros = () => listMacros().then(setMacros);
+  const refreshWorkspaces = () => listWorkspaces().then(setWorkspaces);
+  const refreshMacroGroups = () => listMacroGroups().then(setMacroGroups);
 
   // Responsive window & sidebar state
   const [windowWidth, setWindowWidth] = useState(() => (typeof window !== "undefined" ? window.innerWidth : 1200));
@@ -162,7 +198,7 @@ function AppContent() {
 
   useEffect(() => {
     applyTheme(getStoredTheme(), getStoredAccent());
-    Promise.all([refreshProfiles(), refreshMacros()]).then(() => setReady(true));
+    Promise.all([refreshProfiles(), refreshMacros(), refreshWorkspaces(), refreshMacroGroups()]).then(() => setReady(true));
   }, []);
 
   // Intercept window close requests
@@ -333,10 +369,14 @@ function AppContent() {
     };
   }, [profiles, activeId, activeNav]);
 
-  const handleOpenProfile = (profile: ProfileSummary, initialSubView?: ServerHubSubView) => {
+  const handleOpenProfile = (
+    profile: ProfileSummary,
+    initialSubView?: ServerHubSubView,
+    forceNewTab: boolean = false
+  ) => {
     // 1. Check if the currently active tab is an empty 'connect' launcher tab
     const activeTab = tabs.find((t) => t.id === activeId);
-    if (activeTab && activeTab.layout.kind === "single" && activeTab.layout.pane.content.kind === "connect") {
+    if (!forceNewTab && activeTab && activeTab.layout.kind === "single" && activeTab.layout.pane.content.kind === "connect") {
       updatePane(activeTab.id, activeTab.layout.pane.id, (p) => ({
         ...p,
         title: profile.name,
@@ -353,18 +393,30 @@ function AppContent() {
       return;
     }
 
-    // 2. Check if this profile is already open in an existing single tab
-    const existingTab = tabs.find(
+    // 2. Count existing open tabs for this profile to format numbered tab title
+    const existingCount = tabs.filter(
       (t) =>
         t.layout.kind === "single" &&
         t.layout.pane.content.kind === "ssh" &&
         t.layout.pane.content.profileId === profile.id
-    );
-    if (existingTab) {
-      setActiveId(existingTab.id);
-      setActiveNav("servers");
-      return;
+    ).length;
+
+    // If not forcing a new tab, focus the existing tab if any
+    if (!forceNewTab) {
+      const existingTab = tabs.find(
+        (t) =>
+          t.layout.kind === "single" &&
+          t.layout.pane.content.kind === "ssh" &&
+          t.layout.pane.content.profileId === profile.id
+      );
+      if (existingTab) {
+        setActiveId(existingTab.id);
+        setActiveNav("servers");
+        return;
+      }
     }
+
+    const tabTitle = existingCount > 0 ? `${profile.name} (${existingCount + 1})` : profile.name;
 
     // 3. Otherwise, create a new tab and focus it
     const tab: Tab = {
@@ -373,7 +425,7 @@ function AppContent() {
         kind: "single",
         pane: {
           id: genId("pane"),
-          title: profile.name,
+          title: tabTitle,
           content: {
             kind: "ssh",
             session: profileSession(profile),
@@ -390,19 +442,579 @@ function AppContent() {
     setActiveNav("servers");
   };
 
-  const handleNewMacroTab = () => {
-    const tab: Tab = { id: genId("tab"), layout: { kind: "single", pane: { id: genId("pane"), title: "New Macro", content: { kind: "macro-editor" } } } };
-    setTabs((prev) => [...prev, tab]);
-    setActiveId(tab.id);
-    setActiveNav("macros");
+  const handleOpenNewTabForProfile = (profile: ProfileSummary) => {
+    handleOpenProfile(profile, "terminal", true);
+  };
+
+  const handleOpenMacroSidesheet = (profileId?: number, terminalRef?: React.RefObject<TerminalHandle | null>) => {
+    setMacroSidesheetProfileId(profileId);
+    setMacroSidesheetBoundTerminal(terminalRef || null);
+    setMacroSidesheetOpen(true);
+  };
+
+  const getActiveLocalShell = (tab?: Tab): string | null => {
+    if (tab && tab.layout.kind === "single" && tab.layout.pane.content.kind === "local") {
+      return tab.layout.pane.content.shell || "powershell";
+    }
+    return null;
+  };
+
+  const handleRunSingleMacro = async (macro: MacroSummary, target?: string) => {
+    const steps = await getMacroSteps(macro.id);
+    if (steps.length === 0) return;
+
+    const activeTab = tabs.find((t) => t.id === activeId);
+    const activeLocalShell = getActiveLocalShell(activeTab);
+    const isActiveTabLocal = activeLocalShell !== null;
+
+    // 1. Explicit local shell target from sidesheet:
+    if (target && target.startsWith("local:")) {
+      const shell = target.replace("local:", "");
+      const isMatchingLocalActive = activeLocalShell === shell;
+
+      if (isMatchingLocalActive && macroSidesheetBoundTerminal?.current) {
+        setMacroSidesheetRunningState({
+          isRunning: true,
+          label: `Running "${macro.name}" (Local ${shell})...`,
+          onCancel: () => macroSidesheetBoundTerminal.current?.abortMacro(),
+        });
+        try {
+          await macroSidesheetBoundTerminal.current.runMacro(steps, macro.haltOnError);
+        } finally {
+          setMacroSidesheetRunningState({ isRunning: false });
+        }
+        return;
+      }
+
+      setMacroSidesheetOpen(false);
+      await handleRunMacro(macro.id, { shell });
+      return;
+    }
+
+    // 2. Explicit SSH server target from sidesheet:
+    if (target && target.startsWith("ssh:")) {
+      const profId = Number(target.replace("ssh:", ""));
+      const isTargetingBoundServer = macroSidesheetProfileId && profId === macroSidesheetProfileId;
+
+      if (isTargetingBoundServer && macroSidesheetBoundTerminal?.current) {
+        setMacroSidesheetRunningState({
+          isRunning: true,
+          label: `Running "${macro.name}"...`,
+          onCancel: () => macroSidesheetBoundTerminal.current?.abortMacro(),
+        });
+        try {
+          await macroSidesheetBoundTerminal.current.runMacro(steps, macro.haltOnError);
+        } finally {
+          setMacroSidesheetRunningState({ isRunning: false });
+        }
+        return;
+      }
+
+      setMacroSidesheetOpen(false);
+      await handleRunMacro(macro.id, { profileId: profId });
+      return;
+    }
+
+    // 3. Target is "" (Active Terminal Session):
+    // If macro is configured for a specific server:
+    if (macro.profileId != null) {
+      const isTargetingBoundServer =
+        macroSidesheetProfileId && macro.profileId === macroSidesheetProfileId;
+      if (isTargetingBoundServer && macroSidesheetBoundTerminal?.current) {
+        setMacroSidesheetRunningState({
+          isRunning: true,
+          label: `Running "${macro.name}"...`,
+          onCancel: () => macroSidesheetBoundTerminal.current?.abortMacro(),
+        });
+        try {
+          await macroSidesheetBoundTerminal.current.runMacro(steps, macro.haltOnError);
+        } finally {
+          setMacroSidesheetRunningState({ isRunning: false });
+        }
+        return;
+      }
+      setMacroSidesheetOpen(false);
+      await handleRunMacro(macro.id, { profileId: macro.profileId });
+      return;
+    }
+
+    // If macro is configured for Local Machine:
+    const isLocalMacro =
+      macro.shell === "powershell" || macro.shell === "cmd" || macro.shell === "wsl";
+    if (isLocalMacro) {
+      // If currently active tab is already a local terminal and bound, run in it!
+      if (isActiveTabLocal && macroSidesheetBoundTerminal?.current) {
+        setMacroSidesheetRunningState({
+          isRunning: true,
+          label: `Running "${macro.name}" (Local)...`,
+          onCancel: () => macroSidesheetBoundTerminal.current?.abortMacro(),
+        });
+        try {
+          await macroSidesheetBoundTerminal.current.runMacro(steps, macro.haltOnError);
+        } finally {
+          setMacroSidesheetRunningState({ isRunning: false });
+        }
+        return;
+      }
+
+      // If active tab is SSH or not a local tab, DO NOT run inside SSH server! Open local terminal!
+      setMacroSidesheetOpen(false);
+      await handleRunMacro(macro.id, { shell: macro.shell });
+      return;
+    }
+
+    // Generic macro (Active Tab):
+    if (macroSidesheetBoundTerminal?.current) {
+      setMacroSidesheetRunningState({
+        isRunning: true,
+        label: `Running "${macro.name}"...`,
+        onCancel: () => macroSidesheetBoundTerminal.current?.abortMacro(),
+      });
+      try {
+        await macroSidesheetBoundTerminal.current.runMacro(steps, macro.haltOnError);
+      } finally {
+        setMacroSidesheetRunningState({ isRunning: false });
+      }
+    } else {
+      setMacroSidesheetOpen(false);
+      await handleRunMacro(macro.id);
+    }
+  };
+
+  const handleRunGroupMacro = async (group: MacroGroupSummary, target?: string) => {
+    if (group.macroIds.length === 0) return;
+    const childMacros = group.macroIds
+      .map((id) => macros.find((m) => m.id === id))
+      .filter((m): m is MacroSummary => m != null);
+
+    const activeTab = tabs.find((t) => t.id === activeId);
+    const isActiveTabLocal = getActiveLocalShell(activeTab) !== null;
+
+    const isExplicitLocal = target && target.startsWith("local:");
+    const isExplicitSsh = target && target.startsWith("ssh:");
+
+    const canRunInBound =
+      macroSidesheetBoundTerminal?.current &&
+      (!target ||
+        (isExplicitLocal && isActiveTabLocal) ||
+        (isExplicitSsh &&
+          macroSidesheetProfileId &&
+          Number(target.replace("ssh:", "")) === macroSidesheetProfileId));
+
+    if (canRunInBound && macroSidesheetBoundTerminal?.current) {
+      let cancelled = false;
+      for (let i = 0; i < childMacros.length; i++) {
+        if (cancelled) break;
+        const m = childMacros[i];
+        const steps = await getMacroSteps(m.id);
+        setMacroSidesheetRunningState({
+          isRunning: true,
+          label: `[${group.name}] Macro ${i + 1}/${childMacros.length}: ${m.name}`,
+          onCancel: () => {
+            cancelled = true;
+            macroSidesheetBoundTerminal.current?.abortMacro();
+          },
+        });
+        const success = await macroSidesheetBoundTerminal.current.runMacro(steps, group.haltOnError);
+        if (!success && group.haltOnError) break;
+      }
+      setMacroSidesheetRunningState({ isRunning: false });
+    } else {
+      const allSteps: string[] = [];
+      for (const m of childMacros) {
+        const s = await getMacroSteps(m.id);
+        allSteps.push(...s);
+      }
+      setMacroSidesheetOpen(false);
+
+      if (isExplicitLocal) {
+        const shell = target.replace("local:", "");
+        const tab: Tab = {
+          id: genId("tab"),
+          layout: {
+            kind: "single",
+            pane: {
+              id: genId("pane"),
+              title: `Local (${shell}): ${group.name}`,
+              content: {
+                kind: "local",
+                shell,
+                initialCommands: allSteps,
+              },
+            },
+          },
+        };
+        setTabs((prev) => [...prev, tab]);
+        setActiveId(tab.id);
+        setActiveNav("servers");
+        return;
+      }
+
+      const targetProfId = isExplicitSsh
+        ? Number(target.replace("ssh:", ""))
+        : undefined;
+      const prof = targetProfId ? profiles.find((p) => p.id === targetProfId) : undefined;
+      const tab: Tab = {
+        id: genId("tab"),
+        layout: {
+          kind: "single",
+          pane: {
+            id: genId("pane"),
+            title: prof ? `${prof.name}: ${group.name}` : group.name,
+            content: prof
+              ? {
+                  kind: "ssh",
+                  session: profileSession(prof),
+                  profileId: prof.id,
+                  initialSubView: "terminal",
+                  profileName: prof.name,
+                  host: prof.host,
+                  initialCommands: allSteps,
+                }
+              : {
+                  kind: "local",
+                  initialCommands: allSteps,
+                },
+          },
+        },
+      };
+      setTabs((prev) => [...prev, tab]);
+      setActiveId(tab.id);
+      setActiveNav("servers");
+    }
+  };
+
+  const handleRunCustomQueue = async (queueMacroIds: number[], target?: string) => {
+    const queueMacros = queueMacroIds
+      .map((id) => macros.find((m) => m.id === id))
+      .filter((m): m is MacroSummary => m != null);
+    if (queueMacros.length === 0) return;
+
+    const activeTab = tabs.find((t) => t.id === activeId);
+    const isActiveTabLocal = getActiveLocalShell(activeTab) !== null;
+
+    const isExplicitLocal = target && target.startsWith("local:");
+    const isExplicitSsh = target && target.startsWith("ssh:");
+
+    const canRunInBound =
+      macroSidesheetBoundTerminal?.current &&
+      (!target ||
+        (isExplicitLocal && isActiveTabLocal) ||
+        (isExplicitSsh &&
+          macroSidesheetProfileId &&
+          Number(target.replace("ssh:", "")) === macroSidesheetProfileId));
+
+    if (canRunInBound && macroSidesheetBoundTerminal?.current) {
+      let cancelled = false;
+      for (let i = 0; i < queueMacros.length; i++) {
+        if (cancelled) break;
+        const m = queueMacros[i];
+        const steps = await getMacroSteps(m.id);
+        setMacroSidesheetRunningState({
+          isRunning: true,
+          label: `Queue ${i + 1}/${queueMacros.length}: ${m.name}`,
+          onCancel: () => {
+            cancelled = true;
+            macroSidesheetBoundTerminal.current?.abortMacro();
+          },
+        });
+        const success = await macroSidesheetBoundTerminal.current.runMacro(steps, m.haltOnError);
+        if (!success && m.haltOnError) break;
+      }
+      setMacroSidesheetRunningState({ isRunning: false });
+    } else {
+      const allSteps: string[] = [];
+      for (const m of queueMacros) {
+        const s = await getMacroSteps(m.id);
+        allSteps.push(...s);
+      }
+      setMacroSidesheetOpen(false);
+
+      if (isExplicitLocal) {
+        const shell = target.replace("local:", "");
+        const tab: Tab = {
+          id: genId("tab"),
+          layout: {
+            kind: "single",
+            pane: {
+              id: genId("pane"),
+              title: `Local (${shell}): Custom Queue`,
+              content: {
+                kind: "local",
+                shell,
+                initialCommands: allSteps,
+              },
+            },
+          },
+        };
+        setTabs((prev) => [...prev, tab]);
+        setActiveId(tab.id);
+        setActiveNav("servers");
+        return;
+      }
+
+      const targetProfId = isExplicitSsh
+        ? Number(target.replace("ssh:", ""))
+        : undefined;
+      const prof = targetProfId ? profiles.find((p) => p.id === targetProfId) : undefined;
+      const tab: Tab = {
+        id: genId("tab"),
+        layout: {
+          kind: "single",
+          pane: {
+            id: genId("pane"),
+            title: prof ? `${prof.name}: Custom Queue` : "Custom Queue",
+            content: prof
+              ? {
+                  kind: "ssh",
+                  session: profileSession(prof),
+                  profileId: prof.id,
+                  initialSubView: "terminal",
+                  profileName: prof.name,
+                  host: prof.host,
+                  initialCommands: allSteps,
+                }
+              : {
+                  kind: "local",
+                  initialCommands: allSteps,
+                },
+          },
+        },
+      };
+      setTabs((prev) => [...prev, tab]);
+      setActiveId(tab.id);
+      setActiveNav("servers");
+    }
+  };
+
+  const handleSaveGroup = async (name: string, folder?: string, macroIds?: number[]) => {
+    if (!name.trim() || !macroIds || macroIds.length === 0) return;
+    await saveMacroGroup({
+      name: name.trim(),
+      folder: folder?.trim() || undefined,
+      haltOnError: true,
+      macroIds,
+    });
+    await refreshMacroGroups();
+    toast({
+      title: "Group Macro Saved",
+      description: `Saved "${name}" with ${macroIds.length} macros.`,
+      status: "success",
+    });
+  };
+
+  const handleDeleteGroup = async (id: number) => {
+    await deleteMacroGroup(id);
+    await refreshMacroGroups();
+    toast({
+      title: "Group Deleted",
+      description: "Group macro removed.",
+      status: "info",
+    });
+  };
+
+  const handleSaveWorkspace = async (params: {
+    id?: number;
+    name: string;
+    folder?: string;
+    layoutMode: "tabs" | "split";
+    terminals: WorkspaceTerminalDef[];
+  }) => {
+    if (params.id) {
+      await updateWorkspace({
+        id: params.id,
+        name: params.name,
+        folder: params.folder,
+        layoutMode: params.layoutMode,
+        terminals: params.terminals,
+      });
+      toast({
+        title: "Workspace Updated",
+        description: `Updated workspace "${params.name}".`,
+        status: "success",
+      });
+    } else {
+      await saveWorkspace({
+        name: params.name,
+        folder: params.folder,
+        layoutMode: params.layoutMode,
+        terminals: params.terminals,
+      });
+      toast({
+        title: "Workspace Created",
+        description: `Created workspace "${params.name}".`,
+        status: "success",
+      });
+    }
+    await refreshWorkspaces();
+  };
+
+  const handleDeleteWorkspace = async (id: number) => {
+    await deleteWorkspace(id);
+    await refreshWorkspaces();
+    toast({
+      title: "Workspace Deleted",
+      description: "Workspace removed.",
+      status: "info",
+    });
+  };
+
+  const handleNewWorkspace = () => {
+    setEditingWorkspace(null);
+    setShowWorkspaceModal(true);
+  };
+
+  const handleEditWorkspace = (ws: WorkspaceSummary) => {
+    setEditingWorkspace(ws);
+    setShowWorkspaceModal(true);
+  };
+
+  const handleLaunchWorkspace = (ws: WorkspaceSummary) => {
+    if (ws.terminals.length === 0) return;
+
+    if (ws.layoutMode === "split" && ws.terminals.length >= 2) {
+      const t1 = ws.terminals[0];
+      const t2 = ws.terminals[1];
+      const p1Profile = t1.targetKind === "ssh" && t1.profileId ? profiles.find((p) => p.id === t1.profileId) : undefined;
+      const p2Profile = t2.targetKind === "ssh" && t2.profileId ? profiles.find((p) => p.id === t2.profileId) : undefined;
+
+      const p1Content: TabContentState = p1Profile
+        ? {
+            kind: "ssh",
+            session: profileSession(p1Profile),
+            profileId: p1Profile.id,
+            initialSubView: "terminal",
+            profileName: p1Profile.name,
+            host: p1Profile.host,
+            initialCommands: t1.startupCommand ? [t1.startupCommand] : undefined,
+          }
+        : {
+            kind: "local",
+            shell: t1.shell,
+            cwd: t1.cwd,
+            initialCommands: t1.startupCommand ? [t1.startupCommand] : undefined,
+          };
+
+      const p2Content: TabContentState = p2Profile
+        ? {
+            kind: "ssh",
+            session: profileSession(p2Profile),
+            profileId: p2Profile.id,
+            initialSubView: "terminal",
+            profileName: p2Profile.name,
+            host: p2Profile.host,
+            initialCommands: t2.startupCommand ? [t2.startupCommand] : undefined,
+          }
+        : {
+            kind: "local",
+            shell: t2.shell,
+            cwd: t2.cwd,
+            initialCommands: t2.startupCommand ? [t2.startupCommand] : undefined,
+          };
+
+      const tab: Tab = {
+        id: genId("tab"),
+        layout: {
+          kind: "split",
+          direction: "row",
+          panes: [
+            { id: genId("pane"), title: t1.title, content: p1Content },
+            { id: genId("pane"), title: t2.title, content: p2Content },
+          ],
+        },
+      };
+
+      const remainingTabs: Tab[] = ws.terminals.slice(2).map((t) => {
+        const prof = t.targetKind === "ssh" && t.profileId ? profiles.find((p) => p.id === t.profileId) : undefined;
+        return {
+          id: genId("tab"),
+          layout: {
+            kind: "single",
+            pane: {
+              id: genId("pane"),
+              title: t.title,
+              content: prof
+                ? {
+                    kind: "ssh",
+                    session: profileSession(prof),
+                    profileId: prof.id,
+                    initialSubView: "terminal",
+                    profileName: prof.name,
+                    host: prof.host,
+                    initialCommands: t.startupCommand ? [t.startupCommand] : undefined,
+                  }
+                : {
+                    kind: "local",
+                    shell: t.shell,
+                    cwd: t.cwd,
+                    initialCommands: t.startupCommand ? [t.startupCommand] : undefined,
+                  },
+            },
+          },
+        };
+      });
+
+      setTabs((prev) => [...prev, tab, ...remainingTabs]);
+      setActiveId(tab.id);
+      setActiveNav("servers");
+      toast({
+        title: "Workspace Launched",
+        description: `Launched ${ws.name} in split layout.`,
+        status: "success",
+      });
+    } else {
+      const newTabs: Tab[] = ws.terminals.map((t) => {
+        const prof = t.targetKind === "ssh" && t.profileId ? profiles.find((p) => p.id === t.profileId) : undefined;
+        return {
+          id: genId("tab"),
+          layout: {
+            kind: "single",
+            pane: {
+              id: genId("pane"),
+              title: t.title,
+              content: prof
+                ? {
+                    kind: "ssh",
+                    session: profileSession(prof),
+                    profileId: prof.id,
+                    initialSubView: "terminal",
+                    profileName: prof.name,
+                    host: prof.host,
+                    initialCommands: t.startupCommand ? [t.startupCommand] : undefined,
+                  }
+                : {
+                    kind: "local",
+                    shell: t.shell,
+                    cwd: t.cwd,
+                    initialCommands: t.startupCommand ? [t.startupCommand] : undefined,
+                  },
+            },
+          },
+        };
+      });
+
+      setTabs((prev) => [...prev, ...newTabs]);
+      if (newTabs.length > 0) {
+        setActiveId(newTabs[0].id);
+      }
+      setActiveNav("servers");
+      toast({
+        title: "Workspace Launched",
+        description: `Launched ${ws.name} (${ws.terminals.length} tabs).`,
+        status: "success",
+      });
+    }
+  };
+
+  const handleNewMacroTab = (defaultFolder?: string) => {
+    setEditingMacroId(null);
+    setMacroModalDefaultFolder(defaultFolder);
+    setShowMacroModal(true);
   };
 
   const handleEditMacroTab = (macroId: number) => {
-    const macro = macros.find((m) => m.id === macroId);
-    const tab: Tab = { id: genId("tab"), layout: { kind: "single", pane: { id: genId("pane"), title: macro ? `Edit: ${macro.name}` : "Edit Macro", content: { kind: "macro-editor", macroId } } } };
-    setTabs((prev) => [...prev, tab]);
-    setActiveId(tab.id);
-    setActiveNav("macros");
+    setEditingMacroId(macroId);
+    setShowMacroModal(true);
   };
 
   const handleRunMacro = async (
@@ -477,7 +1089,7 @@ function AppContent() {
       setActiveId(tab.id);
       setActiveNav("servers");
     } else {
-      const shell = shellOverride || macro.shell || "powershell";
+      const shell = shellOverride || (macro.shell && macro.shell !== "active" ? macro.shell : undefined) || "powershell";
       // Check if currently active tab is an empty 'connect' launcher tab
       const activeTab = tabs.find((t) => t.id === activeId);
       if (activeTab && activeTab.layout.kind === "single" && activeTab.layout.pane.content.kind === "connect") {
@@ -620,7 +1232,7 @@ function AppContent() {
       activeNav={activeNav}
       onSelectNav={(nav) => {
         setActiveNav(nav);
-        if (nav === "dashboard" || nav === "settings" || nav === "keys" || nav === "about") {
+        if (nav === "dashboard" || nav === "settings" || nav === "keys" || nav === "about" || nav === "workspaces") {
           setActiveId("dashboard");
         }
         if (isMobile) {
@@ -661,7 +1273,13 @@ function AppContent() {
       onRefresh={() => {
         refreshProfiles();
         refreshMacros();
+        refreshWorkspaces();
+        refreshMacroGroups();
       }}
+      workspaceCount={workspaces.length}
+      onOpenNewTab={handleOpenNewTabForProfile}
+      onOpenMacroSidesheet={handleOpenMacroSidesheet}
+      onNewWorkspace={handleNewWorkspace}
     />
   );
 
@@ -745,7 +1363,7 @@ function AppContent() {
 
         <div className="relative min-w-0 min-h-0 flex-1">
           {/* Dashboard View */}
-          <div className={cn("h-full w-full", activeId === "dashboard" && activeNav !== "keys" && activeNav !== "settings" && activeNav !== "about" ? "block" : "hidden")}>
+          <div className={cn("h-full w-full", activeId === "dashboard" && activeNav !== "keys" && activeNav !== "settings" && activeNav !== "about" && activeNav !== "workspaces" ? "block" : "hidden")}>
             <ServerDashboard
               profiles={profiles}
               macros={macros}
@@ -784,9 +1402,22 @@ function AppContent() {
             />
           </div>
 
+          {/* Workspaces View */}
+          <div className={cn("h-full w-full", activeNav === "workspaces" ? "block" : "hidden")}>
+            <WorkspacesView
+              workspaces={workspaces}
+              profiles={profiles}
+              onLaunchWorkspace={handleLaunchWorkspace}
+              onSaveWorkspace={handleSaveWorkspace}
+              onDeleteWorkspace={handleDeleteWorkspace}
+              onNewWorkspace={handleNewWorkspace}
+              onEditWorkspace={handleEditWorkspace}
+            />
+          </div>
+
           {/* Open Server Tabs */}
           {tabs.map((tab) => {
-            const isTabVisible = tab.id === activeId && activeNav !== "keys" && activeNav !== "settings" && activeNav !== "about";
+            const isTabVisible = tab.id === activeId && activeNav !== "keys" && activeNav !== "settings" && activeNav !== "about" && activeNav !== "workspaces";
             return (
               <div
                 key={tab.id}
@@ -815,6 +1446,7 @@ function AppContent() {
                         setEditingProfile(null);
                         setShowServerModal(true);
                       }}
+                      onOpenMacroSidesheet={handleOpenMacroSidesheet}
                     />
                   </div>
                 ) : (
@@ -841,6 +1473,7 @@ function AppContent() {
                           setEditingProfile(null);
                           setShowServerModal(true);
                         }}
+                        onOpenMacroSidesheet={handleOpenMacroSidesheet}
                       />
                     </div>
                   ))
@@ -850,6 +1483,26 @@ function AppContent() {
           })}
         </div>
       </div>
+
+      {/* Macro Sidesheet Drawer */}
+      <MacroSidesheet
+        isOpen={macroSidesheetOpen}
+        onClose={() => setMacroSidesheetOpen(false)}
+        macros={macros}
+        macroGroups={macroGroups}
+        profiles={profiles}
+        activeProfileId={macroSidesheetProfileId}
+        isBoundToTerminal={Boolean(macroSidesheetBoundTerminal)}
+        onRunSingleMacro={handleRunSingleMacro}
+        onRunGroupMacro={handleRunGroupMacro}
+        onRunCustomQueue={handleRunCustomQueue}
+        onEditMacro={handleEditMacroTab}
+        onDeleteMacro={handleDeleteMacro}
+        onSaveGroup={handleSaveGroup}
+        onDeleteGroup={handleDeleteGroup}
+        onNewMacro={handleNewMacroTab}
+        runningState={macroSidesheetRunningState}
+      />
 
       {/* Add / Edit Server Modal */}
       <ServerFormModal
@@ -876,6 +1529,29 @@ function AppContent() {
             pinned: false,
           });
         }}
+      />
+
+      {/* Add / Edit Macro Modal */}
+      <MacroModal
+        isOpen={showMacroModal}
+        onClose={() => setShowMacroModal(false)}
+        editingMacroId={editingMacroId}
+        defaultFolder={macroModalDefaultFolder}
+        profiles={profiles}
+        macros={macros}
+        onSaveMacro={handleSaveMacro}
+      />
+
+      {/* Add / Edit Workspace Modal */}
+      <WorkspaceModal
+        isOpen={showWorkspaceModal}
+        onClose={() => setShowWorkspaceModal(false)}
+        onSave={async (params) => {
+          await handleSaveWorkspace(params);
+          setShowWorkspaceModal(false);
+        }}
+        editingWorkspace={editingWorkspace}
+        profiles={profiles}
       />
 
       {/* Close Confirmation Prompt Modal */}

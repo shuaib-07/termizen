@@ -456,12 +456,30 @@ body {
 @media (prefers-reduced-motion: reduce) {
   .t-dropdown,
   .t-dropdown[data-state="open"],
-  .t-dropdown[data-state="closed"] {
+  .t-dropdown[data-state="closed"],
+  .animate-marquee-loop {
     animation: none !important;
     transition: none !important;
     transform: none !important;
     opacity: 1 !important;
   }
 }
+
+@keyframes marquee-loop {
+  0% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(-50%);
+  }
+}
+
+.animate-marquee-loop {
+  display: flex;
+  width: max-content;
+  animation: marquee-loop var(--marquee-duration, 8s) linear infinite;
+  will-change: transform;
+}
+
 
 

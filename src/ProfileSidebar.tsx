@@ -7,7 +7,7 @@ import {
   Palette,
   Pencil,
   Pin,
-  Play,
+  Plus,
   Server,
   Terminal,
   Trash2,
@@ -17,7 +17,6 @@ import type { MacroSummary, ProfileSummary } from "./sessions";
 import type { ServerHubSubView } from "./types";
 import { NativeNestedList, ListItem } from "@/components/NativeNestedList";
 import { NativeDelete } from "@/components/NativeDelete";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import {
   ContextMenuContent,
@@ -27,7 +26,6 @@ import {
   ContextMenuShortcut,
 } from "@/components/ui/context-menu";
 import {
-  macroAppliesToProfile,
   updateProfileFolder,
   updateMacroFolder,
   deleteMacro,
@@ -47,88 +45,83 @@ function ProfileActions({
   profile,
   onDelete,
   onOpenSubView,
+  onOpenNewTab,
+  onOpenMacroSidesheet,
 }: {
   profile: ProfileSummary;
   onDelete: (id: number) => void;
   onOpenSubView: (profile: ProfileSummary, subView: ServerHubSubView) => void;
+  onOpenNewTab?: (profile: ProfileSummary) => void;
+  onOpenMacroSidesheet?: (profileId: number) => void;
 }) {
-  return (
-    <span className="flex items-center gap-0.5">
-      {profile.kind === "ssh" && (
-        <>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-6 w-6 text-muted-foreground hover:text-cyan-400 cursor-pointer"
-            onClick={(e) => {
-              e.stopPropagation();
-              onOpenSubView(profile, "monitor");
-            }}
-            title="Open Live Status Charts"
-          >
-            <Activity className="h-3.5 w-3.5" />
-          </Button>
-
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-6 w-6 text-muted-foreground hover:text-emerald-400 cursor-pointer"
-            onClick={(e) => {
-              e.stopPropagation();
-              onOpenSubView(profile, "logs");
-            }}
-            title="Open Live Service Logs"
-          >
-            <FileText className="h-3.5 w-3.5" />
-          </Button>
-        </>
-      )}
-      <NativeDelete size="sm" onConfirm={() => {}} onDelete={() => onDelete(profile.id)} />
-    </span>
-  );
-}
-
-function ProfileMacroRow({
-  profile,
-  execMacros,
-  onRunMacro,
-}: {
-  profile: ProfileSummary;
-  execMacros: MacroSummary[];
-  onRunMacro: (profileId: number, macroId: number) => void;
-}) {
-  const [selectedMacro, setSelectedMacro] = useState("");
-
   return (
     <div
-      className="flex items-center gap-1.5 pl-7 pr-2 pt-0.5 pb-1 w-full"
+      className="flex items-center pl-6 pt-0.5 pb-1"
       onClick={(e) => e.stopPropagation()}
     >
-      <Select value={selectedMacro || undefined} onValueChange={setSelectedMacro}>
-        <SelectTrigger className="h-6 flex-1 min-w-0 px-2 text-[11px] bg-background/50 border-border/60 hover:bg-background/80 hover:border-border transition-colors">
-          <SelectValue placeholder="Macro…" />
-        </SelectTrigger>
-        <SelectContent>
-          {execMacros.map((m) => (
-            <SelectItem key={m.id} value={String(m.id)}>
-              {m.name}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-      <Button
-        variant="ghost"
-        size="icon"
-        className="h-6 w-6 flex-shrink-0 text-muted-foreground hover:text-foreground cursor-pointer disabled:opacity-40"
-        disabled={!selectedMacro}
-        onClick={(e) => {
-          e.stopPropagation();
-          onRunMacro(profile.id, Number(selectedMacro));
-        }}
-        title="Run exec-mode macro against this profile"
-      >
-        <Play className="h-3.5 w-3.5" />
-      </Button>
+      <div className="flex items-center gap-0.5 rounded-lg bg-zinc-950/80 border border-white/[0.08] p-0.5 shadow-sm backdrop-blur-md">
+        {profile.kind === "ssh" && (
+          <>
+            {onOpenNewTab && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-6 w-6 rounded-md text-muted-foreground hover:text-primary hover:bg-white/[0.08] cursor-pointer"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onOpenNewTab(profile);
+                }}
+                title="Open in New Terminal Tab"
+              >
+                <Plus className="h-3.5 w-3.5" />
+              </Button>
+            )}
+
+            {onOpenMacroSidesheet && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-6 w-6 rounded-md text-muted-foreground hover:text-amber-400 hover:bg-amber-400/10 cursor-pointer"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onOpenMacroSidesheet(profile.id);
+                }}
+                title="Macros for this server"
+              >
+                <Zap className="h-3.5 w-3.5 text-amber-400/90" />
+              </Button>
+            )}
+
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-6 w-6 rounded-md text-muted-foreground hover:text-cyan-400 hover:bg-cyan-400/10 cursor-pointer"
+              onClick={(e) => {
+                e.stopPropagation();
+                onOpenSubView(profile, "monitor");
+              }}
+              title="Live Status Charts"
+            >
+              <Activity className="h-3.5 w-3.5" />
+            </Button>
+
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-6 w-6 rounded-md text-muted-foreground hover:text-emerald-400 hover:bg-emerald-400/10 cursor-pointer"
+              onClick={(e) => {
+                e.stopPropagation();
+                onOpenSubView(profile, "logs");
+              }}
+              title="Live Service Logs"
+            >
+              <FileText className="h-3.5 w-3.5" />
+            </Button>
+          </>
+        )}
+        <div className="h-3 w-[1px] bg-white/[0.08] mx-0.5" />
+        <NativeDelete size="sm" onConfirm={() => {}} onDelete={() => onDelete(profile.id)} />
+      </div>
     </div>
   );
 }
@@ -137,18 +130,22 @@ export default function ProfileSidebar({
   profiles,
   macros,
   onOpen,
+  onOpenNewTab,
+  onOpenMacroSidesheet,
   onEditProfile,
   onDelete,
-  onRunMacro,
-  onEditMacro,
-  onDeleteMacro,
+  onRunMacro: _onRunMacro,
+  onEditMacro: _onEditMacro,
+  onDeleteMacro: _onDeleteMacro,
   onTogglePin,
   onToggleBgMonitoring,
   onRefresh,
 }: {
   profiles: ProfileSummary[];
   macros: MacroSummary[];
-  onOpen: (profile: ProfileSummary, subView?: ServerHubSubView) => void;
+  onOpen: (profile: ProfileSummary, subView?: ServerHubSubView, forceNewTab?: boolean) => void;
+  onOpenNewTab?: (profile: ProfileSummary) => void;
+  onOpenMacroSidesheet?: (profileId: number) => void;
   onEditProfile: (profile: ProfileSummary) => void;
   onDelete: (id: number) => void;
   onRunMacro: (macroIdOrProfileId: number, macroIdOrOptions?: number | { profileId?: number; shell?: string }) => void;
@@ -169,30 +166,42 @@ export default function ProfileSidebar({
   } | null>(null);
 
   const toProfileItem = (p: ProfileSummary): ListItem => {
-    const execMacros = macros.filter((m) => m.runMode === "exec" && macroAppliesToProfile(m, p.id));
     return {
       id: `profile-${p.id}`,
       label: p.name,
       icon: <Server className={`h-3.5 w-3.5 ${p.pinned ? "text-amber-400" : "text-muted-foreground"}`} />,
       onClick: () => onOpen(p, "terminal"),
-      actions: (
+      subRow: (
         <ProfileActions
           profile={p}
           onDelete={onDelete}
           onOpenSubView={onOpen}
+          onOpenNewTab={onOpenNewTab}
+          onOpenMacroSidesheet={onOpenMacroSidesheet}
         />
       ),
-      subRow:
-        p.kind === "ssh" && execMacros.length > 0 ? (
-          <ProfileMacroRow
-            profile={p}
-            execMacros={execMacros}
-            onRunMacro={onRunMacro}
-          />
-        ) : undefined,
       contextMenu: (
         <ContextMenuContent ariaLabel={`Actions for ${p.name}`}>
           <ContextMenuLabel>{p.name}</ContextMenuLabel>
+          <ContextMenuItem onSelect={() => onOpen(p, "terminal")}>
+            <Terminal className="h-4 w-4 mr-2" />
+            <span>Open Terminal</span>
+            <ContextMenuShortcut>Enter</ContextMenuShortcut>
+          </ContextMenuItem>
+
+          {onOpenNewTab && (
+            <ContextMenuItem onSelect={() => onOpenNewTab(p)}>
+              <Plus className="h-4 w-4 mr-2 text-primary" />
+              <span>Open in New Terminal Tab</span>
+            </ContextMenuItem>
+          )}
+
+          {onOpenMacroSidesheet && (
+            <ContextMenuItem onSelect={() => onOpenMacroSidesheet(p.id)}>
+              <Zap className="h-4 w-4 mr-2 text-amber-400" />
+              <span>Run Macros…</span>
+            </ContextMenuItem>
+          )}
           <ContextMenuItem onSelect={() => onOpen(p, "terminal")}>
             <Terminal className="h-4 w-4 mr-2" />
             <span>Open Terminal</span>
@@ -241,69 +250,6 @@ export default function ProfileSidebar({
             <Trash2 className="h-4 w-4" />
             <span>Delete Server</span>
           </ContextMenuItem>
-        </ContextMenuContent>
-      ),
-    };
-  };
-
-  const toMacroItem = (m: MacroSummary): ListItem => {
-    const assignedProfile = m.profileId ? profiles.find((p) => p.id === m.profileId) : undefined;
-    return {
-      id: `macro-${m.id}`,
-      label: m.name,
-      icon: <Zap className="h-3.5 w-3.5 text-amber-400" />,
-      onClick: () => onRunMacro(m.id),
-      actions: (
-        <button
-          type="button"
-          className="flex h-5 w-5 items-center justify-center rounded text-muted-foreground/60 hover:bg-white/[0.08] hover:text-foreground cursor-pointer transition-colors"
-          onClick={(e) => {
-            e.stopPropagation();
-            onEditMacro(m.id);
-          }}
-          title="Edit Macro"
-        >
-          <Pencil className="h-3 w-3" />
-        </button>
-      ),
-      contextMenu: (
-        <ContextMenuContent ariaLabel={`Actions for ${m.name}`}>
-          <ContextMenuLabel>{m.name}</ContextMenuLabel>
-          <ContextMenuItem onSelect={() => onRunMacro(m.id)}>
-            <Play className="h-4 w-4 mr-2 text-emerald-400" />
-            <span>Run Macro</span>
-          </ContextMenuItem>
-          {assignedProfile ? (
-            <ContextMenuItem onSelect={() => onRunMacro(m.id, { profileId: assignedProfile.id })}>
-              <Server className="h-4 w-4 mr-2 text-cyan-400" />
-              <span>Run on {assignedProfile.name}</span>
-            </ContextMenuItem>
-          ) : (
-            <>
-              <ContextMenuItem onSelect={() => onRunMacro(m.id, { shell: "powershell" })}>
-                <Terminal className="h-4 w-4 mr-2 text-sky-400" />
-                <span>Run in PowerShell</span>
-              </ContextMenuItem>
-              <ContextMenuItem onSelect={() => onRunMacro(m.id, { shell: "cmd" })}>
-                <Terminal className="h-4 w-4 mr-2 text-amber-400" />
-                <span>Run in Command Prompt</span>
-              </ContextMenuItem>
-            </>
-          )}
-          <ContextMenuSeparator />
-          <ContextMenuItem onSelect={() => onEditMacro(m.id)}>
-            <Pencil className="h-4 w-4 mr-2 text-muted-foreground" />
-            <span>Edit Macro…</span>
-          </ContextMenuItem>
-          {onDeleteMacro && (
-            <>
-              <ContextMenuSeparator />
-              <ContextMenuItem tone="destructive" onSelect={() => onDeleteMacro(m.id)}>
-                <Trash2 className="h-4 w-4 mr-2" />
-                <span>Delete Macro</span>
-              </ContextMenuItem>
-            </>
-          )}
         </ContextMenuContent>
       ),
     };
@@ -383,7 +329,7 @@ export default function ProfileSidebar({
         id: `folder-${folder}`,
         label: folder,
         icon: <Folder className="h-3.5 w-3.5" style={{ color: color || "var(--muted-foreground)" }} />,
-        children: [...folderProfiles.map(toProfileItem), ...folderMacros.map(toMacroItem)],
+        children: folderProfiles.map(toProfileItem),
         actions: (
           <button
             type="button"

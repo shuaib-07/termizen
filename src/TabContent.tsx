@@ -80,8 +80,8 @@ const TabContent = forwardRef<
     }
 
     const session = useMemo(
-      () => (content.kind === "local" ? localSession(content.shell) : content.session),
-      [content.kind, content.kind === "local" ? content.shell : content.session]
+      () => (content.kind === "local" ? localSession(content.shell, content.cwd) : content.session),
+      [content.kind, content.kind === "local" ? `${content.shell || ""}:${content.cwd || ""}` : content.session]
     );
     const profile = content.profileId ? profiles.find((p) => p.id === content.profileId) : undefined;
     const initialCommands =
