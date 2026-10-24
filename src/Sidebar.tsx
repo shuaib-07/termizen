@@ -5,19 +5,21 @@ import { BloomMenu, type BloomMenuItem } from "@/components/ui/bloom-menu";
 import { FolderModal } from "@/components/folders/FolderModal";
 import { addEmptyFolder, getEmptyFolders } from "@/lib/folderMetadata";
 import { Card } from "@/components/ui/card";
+import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import logo from "@/assets/logo.png";
 import { APP_VERSION } from "@/lib/updater";
 import ProfileSidebar from "./ProfileSidebar";
 import MacrosPanel from "./MacrosPanel";
 import type { MacroSummary, ProfileSummary } from "./sessions";
-import type { ServerHubSubView, SidebarViewMode } from "./types";
+import type { MacroGroupSummary, ServerHubSubView, SidebarViewMode } from "./types";
 
 export default function Sidebar({
   activeNav,
   onSelectNav,
   profiles,
   macros,
+  macroGroups = [],
   hasUpdate,
   onOpenProfile,
   onEditProfile,
@@ -26,13 +28,17 @@ export default function Sidebar({
   onNewMacro,
   onEditMacro,
   onDeleteMacro,
+  onRunGroupMacro,
+  onEditGroup,
+  onDeleteGroup,
+  onNewGroupMacro,
   onTogglePin,
   onToggleBgMonitoring,
   onAddServer,
   onNewTab,
   onOpenKeyVault,
   onRefresh,
-  workspaceCount = 0,
+  workspaceCount: _workspaceCount = 0,
   onOpenNewTab,
   onOpenMacroSidesheet,
   onNewWorkspace,
@@ -41,6 +47,7 @@ export default function Sidebar({
   onSelectNav: (nav: SidebarViewMode) => void;
   profiles: ProfileSummary[];
   macros: MacroSummary[];
+  macroGroups?: MacroGroupSummary[];
   hasUpdate?: boolean;
   onOpenProfile: (profile: ProfileSummary, subView?: ServerHubSubView, forceNewTab?: boolean) => void;
   onEditProfile: (profile: ProfileSummary) => void;
@@ -49,6 +56,10 @@ export default function Sidebar({
   onNewMacro: () => void;
   onEditMacro: (id: number) => void;
   onDeleteMacro: (id: number) => void;
+  onRunGroupMacro?: (group: MacroGroupSummary) => void;
+  onEditGroup?: (group: MacroGroupSummary) => void;
+  onDeleteGroup?: (id: number) => void;
+  onNewGroupMacro?: () => void;
   onTogglePin?: (id: number, pinned: boolean) => void;
   onToggleBgMonitoring?: (id: number, enabled: boolean) => void;
   onAddServer: () => void;
@@ -63,11 +74,11 @@ export default function Sidebar({
   const pillLayoutId = useId();
   const [newFolderModalOpen, setNewFolderModalOpen] = useState(false);
 
-  const NAV_ITEMS: { id: SidebarViewMode; label: string; icon: any; count?: number }[] = [
+  const NAV_ITEMS: { id: SidebarViewMode; label: string; icon: any }[] = [
     { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
-    { id: "servers", label: "Servers", icon: Server, count: profiles.length },
-    { id: "workspaces", label: "Workspaces", icon: Layers, count: workspaceCount },
-    { id: "macros", label: "Macros", icon: Zap, count: macros.length },
+    { id: "servers", label: "Servers", icon: Server },
+    { id: "workspaces", label: "Workspaces", icon: Layers },
+    { id: "macros", label: "Macros", icon: Zap },
     { id: "keys", label: "Key Vault", icon: Key },
   ];
 
@@ -92,6 +103,13 @@ export default function Sidebar({
       description: "Automate commands",
       icon: Zap,
       onClick: onNewMacro,
+    },
+    {
+      id: "new-macro-group",
+      label: "New Macro Group",
+      description: "Multi-macro pipeline",
+      icon: Layers,
+      onClick: onNewGroupMacro ? onNewGroupMacro : onNewMacro,
     },
     {
       id: "new-tab",
@@ -137,7 +155,7 @@ export default function Sidebar({
                 <button
                   key={item.id}
                   onClick={() => onSelectNav(item.id)}
-                  className={`relative z-10 flex items-center justify-between rounded-md px-2 py-1.5 text-xs transition-colors ${
+                  className={`relative z-10 flex items-center rounded-md px-2 py-1.5 text-xs transition-colors ${
                     isActive ? "text-foreground font-semibold" : "text-muted-foreground hover:text-foreground"
                   }`}
                 >
@@ -149,14 +167,9 @@ export default function Sidebar({
                     />
                   )}
                   <span className="flex items-center gap-1.5 truncate">
-                    <Icon className="h-3.5 w-3.5" />
+                    <Icon className="h-3.5 w-3.5 shrink-0" />
                     <span className="truncate">{item.label}</span>
                   </span>
-                  {item.count !== undefined && item.count > 0 && (
-                    <span className="text-[10px] font-mono opacity-70 ml-1">
-                      {item.count}
-                    </span>
-                  )}
                 </button>
               );
             })}
@@ -170,15 +183,16 @@ export default function Sidebar({
           <div className="h-full flex flex-col">
             <div className="px-3 pt-2 flex items-center justify-between text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
               <span>Saved Servers</span>
-              <button
-                type="button"
-                onClick={() => setNewFolderModalOpen(true)}
-                title="Create New Folder"
-                className="flex items-center gap-1 text-[10px] text-muted-foreground hover:text-foreground normal-case font-medium hover:bg-white/[0.06] px-1.5 py-0.5 rounded cursor-pointer transition-colors"
-              >
-                <FolderPlus className="h-3 w-3" />
-                <span>Folder</span>
-              </button>
+              <Tooltip content="Create New Folder" side="bottom">
+                <button
+                  type="button"
+                  onClick={() => setNewFolderModalOpen(true)}
+                  className="flex items-center gap-1 text-[10px] text-muted-foreground hover:text-foreground normal-case font-medium hover:bg-white/[0.06] px-1.5 py-0.5 rounded cursor-pointer transition-colors"
+                >
+                  <FolderPlus className="h-3 w-3" />
+                  <span>Folder</span>
+                </button>
+              </Tooltip>
             </div>
             <div className="flex-1 min-h-0">
               <ProfileSidebar
@@ -201,11 +215,16 @@ export default function Sidebar({
         ) : activeNav === "macros" ? (
           <MacrosPanel
             macros={macros}
+            macroGroups={macroGroups}
             profiles={profiles}
             onNewMacro={onNewMacro}
+            onNewGroup={onNewGroupMacro}
             onRunMacro={onRunMacro}
             onEditMacro={onEditMacro}
             onDelete={onDeleteMacro}
+            onRunGroup={onRunGroupMacro}
+            onEditGroup={onEditGroup}
+            onDeleteGroup={onDeleteGroup}
           />
         ) : activeNav === "settings" ? (
           <div className="p-4 text-xs text-muted-foreground">
@@ -217,9 +236,15 @@ export default function Sidebar({
             <p className="font-semibold text-foreground mb-1">About & Updates</p>
             <p>View app specs, release notes, license details, and developer profile.</p>
           </div>
+        ) : activeNav === "workspaces" ? (
+          <div className="p-4 text-xs text-muted-foreground">
+            <p className="font-semibold text-foreground mb-1">Workspaces Active</p>
+            <p>Manage and launch multi-terminal grid environments in the main view.</p>
+          </div>
         ) : (
           <div className="p-4 text-xs text-muted-foreground">
-            <p>Key Vault active in main view.</p>
+            <p className="font-semibold text-foreground mb-1">Key Vault Active</p>
+            <p>Securely manage reusable private keys in the main view.</p>
           </div>
         )}
       </div>

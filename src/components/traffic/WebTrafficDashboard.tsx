@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useId, useRef } from "react";
+import React, { useEffect, useState, useId, useRef, useMemo } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   Activity,
@@ -14,11 +14,13 @@ import {
   Play,
   RefreshCw,
   Search,
+  ShieldAlert,
   Users,
   XCircle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tooltip } from "@/components/ui/tooltip";
+import { cn } from "@/lib/utils";
 import {
   fetchWebTraffic,
   detectWebLogs,
@@ -299,6 +301,7 @@ export default function WebTrafficDashboard({
 
   // Search filter for endpoints/requests
   const [urlFilter, setUrlFilter] = useState("");
+  const [streamFilter, setStreamFilter] = useState<"all" | "errors" | "api" | "writes">("all");
   const [copiedUrl, setCopiedUrl] = useState<string | null>(null);
 
   // Live timeline history buffer (up to 30 points)
@@ -480,16 +483,105 @@ export default function WebTrafficDashboard({
     );
   }
 
-  const filteredEndpoints = metrics.topEndpoints.filter((e) =>
-    e.path.toLowerCase().includes(urlFilter.toLowerCase())
-  );
+  const filteredEndpoints = useMemo(() => {
+    return metrics.topEndpoints.filter((e) =>
+      e.path.toLowerCase().includes(urlFilter.toLowerCase())
+    );
+  }, [metrics.topEndpoints, urlFilter]);
 
-  const filteredRequests = metrics.recentRequests.filter(
-    (r) =>
-      r.path.toLowerCase().includes(urlFilter.toLowerCase()) ||
-      r.clientIp.includes(urlFilter) ||
-      r.method.toLowerCase().includes(urlFilter.toLowerCase())
-  );
+  const errorRequests = useMemo(() => {
+    return metrics.recentRequests.filter((r) => r.status >= 400);
+  }, [metrics.recentRequests]);
+
+  const groupedErrors = useMemo(() => {
+    const map = new Map<
+      string,
+      { path: string; status: number; count: number; lastClientIp: string; isScannerProbe: boolean }
+    >();
+    for (const r of metrics.recentRequests) {
+      if (r.status >= 400) {
+        const key = `${r.status}:${r.path}`;
+        const existing = map.get(key);
+        const isScannerProbe = /wp-|\.env|\.git|phpmyadmin|actuator|\.php|admin|setup|config/i.test(r.path);
+        if (existing) {
+          existing.count += 1;
+          existing.lastClientIp = r.clientIp;
+        } else {
+          map.set(key, {
+            path: r.path,
+            status: r.status,
+            count: 1,
+            lastClientIp: r.clientIp,
+            isScannerProbe,
+          });
+        }
+      }
+    }
+    return Array.from(map.values()).sort((a, b) => b.count - a.count);
+  }, [metrics.recentRequests]);
+
+  const healthAnalysis = useMemo(() => {
+    const total = metrics.totalSampled || 1;
+    const s2xx = metrics.status.count2xx;
+    const s3xx = metrics.status.count3xx;
+    const s4xx = metrics.status.count4xx;
+    const s5xx = metrics.status.count5xx;
+    const operationalPercent = Math.min(100, Math.max(0, ((s2xx + s3xx) / total) * 100));
+
+    let statusLevel: "healthy" | "attention" | "critical" = "healthy";
+    let title = "Web Server Healthy • All Systems Operational";
+    let explanation = `Your server is successfully processing requests. ${
+      s3xx > 0
+        ? `${s3xx} requests were safely redirected (3xx), which is standard for HTTPS and canonical routing.`
+        : "Zero server or client faults detected."
+    }`;
+
+    if (s5xx > 0) {
+      statusLevel = "critical";
+      title = `Critical • ${s5xx} Server Crashes (5xx) Detected`;
+      explanation =
+        "Your backend returned 5xx server errors (500 Internal Error, 502 Bad Gateway). Check backend service status, memory limits, or application crash logs.";
+    } else if (s4xx > 0) {
+      statusLevel = "attention";
+      title = `Notice • ${s4xx} Client Errors (4xx) Detected`;
+      explanation = `Server backend is 100% stable with 0 crashes. ${s4xx} requests returned 4xx (e.g. 404 Not Found or bot scanner probes). Check the Broken Links inspector below.`;
+    }
+
+    let trafficLoadDesc = "Idle / Minimal traffic";
+    if (metrics.requestsPerSec >= 25) {
+      trafficLoadDesc = "High traffic load";
+    } else if (metrics.requestsPerSec >= 5) {
+      trafficLoadDesc = "Active moderate traffic";
+    } else if (metrics.requestsPerSec > 0) {
+      trafficLoadDesc = "Light traffic";
+    }
+
+    return {
+      statusLevel,
+      title,
+      explanation,
+      operationalPercent,
+      trafficLoadDesc,
+      hasScannerProbes: groupedErrors.some((e) => e.isScannerProbe),
+    };
+  }, [metrics, groupedErrors]);
+
+  const filteredRequests = useMemo(() => {
+    return metrics.recentRequests.filter((r) => {
+      if (streamFilter === "errors" && r.status < 400) return false;
+      if (streamFilter === "api" && !/(\/api\/|\.json|graphql|v1\/|v2\/)/i.test(r.path)) return false;
+      if (streamFilter === "writes" && ["GET", "HEAD", "OPTIONS"].includes(r.method.toUpperCase())) return false;
+
+      if (!urlFilter.trim()) return true;
+      const q = urlFilter.toLowerCase();
+      return (
+        r.path.toLowerCase().includes(q) ||
+        r.clientIp.includes(q) ||
+        r.method.toLowerCase().includes(q) ||
+        String(r.status).includes(q)
+      );
+    });
+  }, [metrics.recentRequests, streamFilter, urlFilter]);
 
   return (
     <div className="h-full overflow-y-auto bg-transparent text-foreground p-4 md:p-5 space-y-4 select-none font-sans">
@@ -627,6 +719,66 @@ export default function WebTrafficDashboard({
         </div>
       </div>
 
+      {/* Human Health & Diagnosis Summary Banner */}
+      {healthAnalysis && (
+        <div
+          className={cn(
+            "rounded-xl p-3.5 border transition-all flex flex-col md:flex-row md:items-center justify-between gap-3 shadow-xs",
+            healthAnalysis.statusLevel === "critical"
+              ? "bg-rose-500/10 border-rose-500/30 text-rose-200"
+              : healthAnalysis.statusLevel === "attention"
+              ? "bg-amber-500/10 border-amber-500/30 text-amber-200"
+              : "bg-emerald-500/10 border-emerald-500/25 text-emerald-200"
+          )}
+        >
+          <div className="flex items-start gap-3">
+            <div
+              className={cn(
+                "flex h-8 w-8 items-center justify-center rounded-lg shrink-0 mt-0.5",
+                healthAnalysis.statusLevel === "critical"
+                  ? "bg-rose-500/20 text-rose-400 border border-rose-500/30"
+                  : healthAnalysis.statusLevel === "attention"
+                  ? "bg-amber-500/20 text-amber-400 border border-amber-500/30"
+                  : "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
+              )}
+            >
+              {healthAnalysis.statusLevel === "critical" ? (
+                <XCircle className="h-4 w-4" />
+              ) : healthAnalysis.statusLevel === "attention" ? (
+                <AlertTriangle className="h-4 w-4" />
+              ) : (
+                <CheckCircle2 className="h-4 w-4" />
+              )}
+            </div>
+            <div className="space-y-0.5">
+              <div className="flex items-center gap-2">
+                <h3 className="text-xs font-bold text-foreground">
+                  {healthAnalysis.title}
+                </h3>
+                <span className="text-[10px] px-1.5 py-0.2 rounded font-mono font-semibold bg-background/50 border border-white/[0.08] text-foreground">
+                  {healthAnalysis.operationalPercent.toFixed(1)}% Operational
+                </span>
+              </div>
+              <p className="text-[11px] text-muted-foreground leading-relaxed">
+                {healthAnalysis.explanation}
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 text-xs font-mono shrink-0 pl-11 md:pl-0">
+            <span className="text-[11px] text-muted-foreground px-2 py-1 rounded bg-black/30 border border-white/[0.06]">
+              {healthAnalysis.trafficLoadDesc}
+            </span>
+            {healthAnalysis.hasScannerProbes && (
+              <span className="inline-flex items-center gap-1 text-[10px] text-amber-400 px-2 py-1 rounded bg-amber-500/10 border border-amber-500/20 font-sans font-medium">
+                <ShieldAlert className="h-3 w-3" />
+                <span>Scanner Bots Detected</span>
+              </span>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Top KPI Cards */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
         {/* Requests per second */}
@@ -655,22 +807,31 @@ export default function WebTrafficDashboard({
           <div className="text-[10px] text-muted-foreground mt-1">Recent buffer</div>
         </div>
 
-        {/* Success Rate */}
+        {/* Operational Rate (2xx + 3xx) */}
         <div className="rounded-xl bg-card/65 backdrop-blur-xl border border-border/70 p-3.5 shadow-sm hover:border-border transition-colors">
           <div className="flex items-center justify-between text-muted-foreground text-xs">
-            <span>Success Rate</span>
+            <span>Operational Rate</span>
             <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400" />
           </div>
           <div className="text-2xl font-bold tracking-tight text-emerald-400 mt-1.5 font-mono">
-            {metrics.successRate.toFixed(1)}%
+            {healthAnalysis ? healthAnalysis.operationalPercent.toFixed(1) : metrics.successRate.toFixed(1)}%
           </div>
-          <div className="text-[10px] text-muted-foreground mt-1">{metrics.status.count2xx} HTTP 2xx</div>
+          <div className="text-[10px] text-muted-foreground mt-1 truncate" title={`${metrics.status.count2xx} OK + ${metrics.status.count3xx} Redirects`}>
+            {metrics.status.count2xx} OK + {metrics.status.count3xx} 3xx
+          </div>
         </div>
 
         {/* 4xx Client Errors */}
-        <div className="rounded-xl bg-card/65 backdrop-blur-xl border border-border/70 p-3.5 shadow-sm hover:border-border transition-colors">
+        <div
+          onClick={() => setStreamFilter(streamFilter === "errors" ? "all" : "errors")}
+          className={cn(
+            "rounded-xl bg-card/65 backdrop-blur-xl border border-border/70 p-3.5 shadow-sm transition-colors cursor-pointer group",
+            streamFilter === "errors" ? "border-amber-400/50 bg-amber-500/10" : "hover:border-border"
+          )}
+          title="Click to toggle Errors filter in stream"
+        >
           <div className="flex items-center justify-between text-muted-foreground text-xs">
-            <span>Client Errors</span>
+            <span className="group-hover:text-amber-300 transition-colors">Client Errors</span>
             <AlertTriangle className="h-3.5 w-3.5 text-amber-400" />
           </div>
           <div className="text-2xl font-bold tracking-tight text-amber-400 mt-1.5 font-mono">
@@ -680,9 +841,17 @@ export default function WebTrafficDashboard({
         </div>
 
         {/* 5xx Server Errors */}
-        <div className="rounded-xl bg-card/65 backdrop-blur-xl border border-border/70 p-3.5 shadow-sm hover:border-border transition-colors">
+        <div
+          onClick={() => setStreamFilter(streamFilter === "errors" ? "all" : "errors")}
+          className={cn(
+            "rounded-xl bg-card/65 backdrop-blur-xl border border-border/70 p-3.5 shadow-sm transition-colors cursor-pointer group",
+            metrics.status.count5xx > 0 && "border-rose-500/50 bg-rose-500/10",
+            streamFilter === "errors" && metrics.status.count5xx > 0 ? "ring-1 ring-rose-500" : "hover:border-border"
+          )}
+          title="Click to toggle Errors filter in stream"
+        >
           <div className="flex items-center justify-between text-muted-foreground text-xs">
-            <span>Server Errors</span>
+            <span className="group-hover:text-rose-300 transition-colors">Server Errors</span>
             <XCircle className="h-3.5 w-3.5 text-rose-400" />
           </div>
           <div className="text-2xl font-bold tracking-tight text-rose-400 mt-1.5 font-mono">
@@ -780,17 +949,18 @@ export default function WebTrafficDashboard({
                         <span className="truncate" title={ep.path}>
                           {ep.path}
                         </span>
-                        <button
-                          onClick={() => handleCopyUrl(ep.path)}
-                          className="text-muted-foreground hover:text-foreground p-0.5 rounded opacity-60 hover:opacity-100 transition-opacity"
-                          title="Copy Path"
-                        >
-                          {copiedUrl === ep.path ? (
-                            <Check className="h-3 w-3 text-emerald-400" />
-                          ) : (
-                            <Copy className="h-3 w-3" />
-                          )}
-                        </button>
+                        <Tooltip content={copiedUrl === ep.path ? "Copied!" : "Copy path"} side="top">
+                          <button
+                            onClick={() => handleCopyUrl(ep.path)}
+                            className="text-muted-foreground hover:text-foreground p-0.5 rounded opacity-60 hover:opacity-100 transition-opacity cursor-pointer"
+                          >
+                            {copiedUrl === ep.path ? (
+                              <Check className="h-3 w-3 text-emerald-400" />
+                            ) : (
+                              <Copy className="h-3 w-3" />
+                            )}
+                          </button>
+                        </Tooltip>
                       </div>
                       <div className="w-full h-1.5 rounded-full bg-muted/40 mt-1.5 overflow-hidden">
                         <div
@@ -812,6 +982,95 @@ export default function WebTrafficDashboard({
             </div>
           </div>
 
+          {/* Broken Links & Errors Inspector */}
+          <div className="rounded-xl bg-card/65 backdrop-blur-xl border border-border/70 p-4 shadow-sm hover:border-border transition-colors space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="font-semibold text-xs text-foreground tracking-tight flex items-center gap-1.5">
+                  <AlertCircle className="h-3.5 w-3.5 text-amber-400" />
+                  <span>Broken Links & Failed Requests</span>
+                </span>
+                <span className="text-[10px] text-muted-foreground font-mono">
+                  ({groupedErrors.length} unique)
+                </span>
+              </div>
+
+              {groupedErrors.length > 0 && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setStreamFilter(streamFilter === "errors" ? "all" : "errors")}
+                  className="h-6 text-[10px] text-amber-400 hover:text-amber-300 hover:bg-amber-400/10 px-2 cursor-pointer font-medium"
+                >
+                  {streamFilter === "errors" ? "Showing In Stream ✓" : "Filter Stream →"}
+                </Button>
+              )}
+            </div>
+
+            {groupedErrors.length === 0 ? (
+              <div className="flex items-center gap-2.5 py-3 px-3 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs">
+                <CheckCircle2 className="h-4 w-4 shrink-0" />
+                <span className="text-[11px] leading-snug">
+                  No broken links or server errors in recent traffic. 100% of requests served cleanly.
+                </span>
+              </div>
+            ) : (
+              <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
+                {groupedErrors.map((err, idx) => (
+                  <div
+                    key={idx}
+                    className="flex flex-col sm:flex-row sm:items-center justify-between p-2 rounded-lg bg-background/50 border border-border/50 gap-2 text-xs"
+                  >
+                    <div className="min-w-0 flex-1 space-y-1">
+                      <div className="flex items-center gap-1.5 font-mono">
+                        <span
+                          className={cn(
+                            "px-1.5 py-0.2 rounded text-[10px] font-bold border",
+                            err.status >= 500
+                              ? "bg-rose-500/15 text-rose-400 border-rose-500/30"
+                              : "bg-amber-500/15 text-amber-400 border-amber-500/30"
+                          )}
+                        >
+                          {err.status}
+                        </span>
+                        <span className="truncate text-foreground font-medium" title={err.path}>
+                          {err.path}
+                        </span>
+                        <Tooltip content={copiedUrl === err.path ? "Copied!" : "Copy path"} side="top">
+                          <button
+                            onClick={() => handleCopyUrl(err.path)}
+                            className="text-muted-foreground hover:text-foreground p-0.5 rounded opacity-60 hover:opacity-100 transition-opacity cursor-pointer"
+                          >
+                            {copiedUrl === err.path ? (
+                              <Check className="h-3 w-3 text-emerald-400" />
+                            ) : (
+                              <Copy className="h-3 w-3" />
+                            )}
+                          </button>
+                        </Tooltip>
+                      </div>
+
+                      <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
+                        <span>Requested by IP: <code className="text-zinc-300 font-mono">{err.lastClientIp}</code></span>
+                        {err.isScannerProbe && (
+                          <span className="inline-flex items-center gap-0.5 text-[9px] text-amber-400 bg-amber-400/10 px-1.5 py-0.2 rounded border border-amber-400/20 font-sans">
+                            <ShieldAlert className="h-2.5 w-2.5" /> Bot Scanner
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="text-right shrink-0">
+                      <span className="text-[11px] font-mono font-semibold text-rose-400">
+                        {err.count} {err.count === 1 ? "failure" : "failures"}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
           {/* HTTP Status Code Breakdown */}
           <div className="rounded-xl bg-card/65 backdrop-blur-xl border border-border/70 p-4 shadow-sm hover:border-border transition-colors space-y-3">
             <span className="font-semibold text-xs text-foreground tracking-tight">
@@ -825,7 +1084,7 @@ export default function WebTrafficDashboard({
                 <div className="text-[10px] text-muted-foreground">
                   {metrics.totalSampled > 0
                     ? ((metrics.status.count2xx / metrics.totalSampled) * 100).toFixed(1)
-                    : 0}%
+                    : 0}% • Normal OK
                 </div>
               </div>
 
@@ -835,7 +1094,7 @@ export default function WebTrafficDashboard({
                 <div className="text-[10px] text-muted-foreground">
                   {metrics.totalSampled > 0
                     ? ((metrics.status.count3xx / metrics.totalSampled) * 100).toFixed(1)
-                    : 0}%
+                    : 0}% • HTTPS / Rewrites
                 </div>
               </div>
 
@@ -845,7 +1104,7 @@ export default function WebTrafficDashboard({
                 <div className="text-[10px] text-muted-foreground">
                   {metrics.totalSampled > 0
                     ? ((metrics.status.count4xx / metrics.totalSampled) * 100).toFixed(1)
-                    : 0}%
+                    : 0}% • Broken / Bots
                 </div>
               </div>
 
@@ -855,7 +1114,7 @@ export default function WebTrafficDashboard({
                 <div className="text-[10px] text-muted-foreground">
                   {metrics.totalSampled > 0
                     ? ((metrics.status.count5xx / metrics.totalSampled) * 100).toFixed(1)
-                    : 0}%
+                    : 0}% • Crash / Fault
                 </div>
               </div>
             </div>
@@ -896,16 +1155,62 @@ export default function WebTrafficDashboard({
 
           {/* Live Request Stream (Tail) */}
           <div className="rounded-xl bg-card/65 backdrop-blur-xl border border-border/70 p-4 shadow-sm hover:border-border transition-colors space-y-3">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
               <div className="flex items-center gap-2">
                 <span className="font-semibold text-xs text-foreground tracking-tight">
                   Live Request Stream Tail
                 </span>
                 <span className="text-[10px] text-muted-foreground font-mono">
-                  (Last {filteredRequests.length})
+                  ({filteredRequests.length} showing)
                 </span>
               </div>
-              <span className="text-[10px] text-muted-foreground">Auto-updating</span>
+
+              {/* Quick Filter Segmented Pills */}
+              <div className="flex items-center gap-1 overflow-x-auto no-scrollbar">
+                <Button
+                  variant={streamFilter === "all" ? "secondary" : "ghost"}
+                  size="sm"
+                  onClick={() => setStreamFilter("all")}
+                  className="h-6 text-[10px] px-2 rounded-md font-medium cursor-pointer"
+                >
+                  All ({metrics.recentRequests.length})
+                </Button>
+                <Button
+                  variant={streamFilter === "errors" ? "secondary" : "ghost"}
+                  size="sm"
+                  onClick={() => setStreamFilter("errors")}
+                  className={cn(
+                    "h-6 text-[10px] px-2 rounded-md font-medium gap-1 cursor-pointer",
+                    errorRequests.length > 0 && "text-amber-400 hover:text-amber-300"
+                  )}
+                >
+                  <span>Errors</span>
+                  <span
+                    className={cn(
+                      "px-1 rounded-full text-[9px] font-mono",
+                      errorRequests.length > 0 ? "bg-amber-400/20 text-amber-300" : "bg-muted text-muted-foreground"
+                    )}
+                  >
+                    {errorRequests.length}
+                  </span>
+                </Button>
+                <Button
+                  variant={streamFilter === "api" ? "secondary" : "ghost"}
+                  size="sm"
+                  onClick={() => setStreamFilter("api")}
+                  className="h-6 text-[10px] px-2 rounded-md font-medium cursor-pointer"
+                >
+                  APIs
+                </Button>
+                <Button
+                  variant={streamFilter === "writes" ? "secondary" : "ghost"}
+                  size="sm"
+                  onClick={() => setStreamFilter("writes")}
+                  className="h-6 text-[10px] px-2 rounded-md font-medium cursor-pointer"
+                >
+                  Writes (POST/PUT)
+                </Button>
+              </div>
             </div>
 
             <div className="space-y-1.5 max-h-72 overflow-y-auto pr-1 font-mono text-[11px]">

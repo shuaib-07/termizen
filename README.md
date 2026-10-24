@@ -33,8 +33,8 @@ Open the [latest release page](https://github.com/shuaib-07/termizen/releases/la
 
 | Platform | Package | Note |
 | :-- | :-- | :-- |
-| **Windows 10/11 (x64 Installer)** | `Termizen_0.2.0_x64-setup.exe` | Guided NSIS installer with desktop and Start Menu shortcuts |
-| **Windows 10/11 (x64 MSI)** | `Termizen_0.2.0_x64_en-US.msi` | Windows Installer package for enterprise deployment |
+| **Windows 10/11 (x64 Installer)** | `Termizen_0.3.0_x64-setup.exe` | Guided NSIS installer with desktop and Start Menu shortcuts |
+| **Windows 10/11 (x64 MSI)** | `Termizen_0.3.0_x64_en-US.msi` | Windows Installer package for enterprise deployment |
 
 Unsigned binary — if Windows SmartScreen displays a warning on first launch, click **More info** then **Run anyway**.
 
@@ -59,12 +59,15 @@ Unsigned binary — if Windows SmartScreen displays a warning on first launch, c
 
 ## Features
 
-- **Multi-pane terminal multiplexer** with horizontal and vertical 50/50 splits, xterm.js canvas rendering, and portable-pty.
+- **Workspaces & Environment Stacks**: Configure multi-terminal environment blueprints that launch in separate tabs or unified split-screen grids with optional automated startup macros.
+- **Dedicated Macros Hub & Group Pipelines**: Full-page automation cockpit with real-time search, execution mode filters (Interactive PTY vs Direct exec), folder grouping, and sequential multi-macro Group Pipelines.
+- **Multi-pane terminal multiplexer** with horizontal and vertical 50/50 splits, arbitrary tree nesting, interactive pane drag-and-swap, split-to-tab extraction, xterm.js canvas rendering, and portable-pty.
 - **Real-time server telemetry** graphing CPU cores, memory/swap, disk partition usage, and network I/O.
-- **Web traffic analytics** parsing Nginx and Apache access logs live with status code breakdowns, top endpoints, request velocity, and client IPs.
+- **Web traffic analytics & health diagnosis** parsing Nginx and Apache access logs live with plain-English server diagnosis, status code breakdowns, top endpoints, bot scanner probe detection, and client IPs.
 - **Service log streaming** with auto-discovery for PM2 apps, Docker containers, and systemd services with ANSI color rendering.
-- **Macro automation** supporting PTY and background exec scripts with halt-on-error policies and per-profile scoping.
+- **Collision-aware spring tooltips** across all interactive controls and terminal selection actions.
 - **Theme and accent personalization** featuring Windows 11 Mica material and custom accent color selection.
+- **Automatic update alerts on launch** checking GitHub releases for new versions with 1-click update prompting.
 
 ## Inspiration & Acknowledgements
 

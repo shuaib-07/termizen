@@ -1,6 +1,6 @@
 import { openUrl } from "@tauri-apps/plugin-opener";
 
-export const APP_VERSION = "0.2.0";
+export const APP_VERSION = "0.3.0";
 export const GITHUB_REPO = "shuaib-07/termizen";
 export const RELEASES_API_URL = `https://api.github.com/repos/${GITHUB_REPO}/releases/latest`;
 export const RELEASES_PAGE_URL = `https://github.com/${GITHUB_REPO}/releases`;

@@ -20,6 +20,9 @@ import {
   Heart,
   User,
   Info,
+  Server,
+  Zap,
+  BookOpen,
 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -390,6 +393,138 @@ export function AboutView({ initialUpdateInfo, onUpdateStatusChange }: AboutView
                   </p>
                 </div>
               </button>
+            </div>
+
+            {/* Core Features & User Guide */}
+            <div className="space-y-4">
+              <div className="flex items-center gap-2">
+                <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary/10 text-primary border border-primary/20">
+                  <BookOpen className="h-4 w-4" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-foreground">
+                    Core Features & Capabilities
+                  </h3>
+                  <p className="text-xs text-muted-foreground">
+                    Learn what makes Termizen powerful and how to get the most out of every feature.
+                  </p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Workspaces & Split Grid */}
+                <Card className="p-5 border border-white/[0.06] bg-card/60 backdrop-blur-xl rounded-2xl flex flex-col justify-between space-y-3">
+                  <div className="space-y-2.5">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10 text-primary border border-primary/20">
+                          <Layers className="h-4 w-4" />
+                        </div>
+                        <div>
+                          <h4 className="text-sm font-bold text-foreground">Workspaces & Split Grid</h4>
+                          <span className="text-[10px] font-mono text-primary font-medium">1-Click Multi-Terminal Stack</span>
+                        </div>
+                      </div>
+                    </div>
+                    <p className="text-xs text-muted-foreground leading-relaxed">
+                      Orchestrate your entire tech stack into a single preset. Bundle databases, backends, and frontend dev servers into a synchronized multi-pane grid (up to 6 resizable terminals) or separate tabs.
+                    </p>
+                    <div className="space-y-1.5 pt-1 border-t border-white/[0.04]">
+                      <span className="text-[10px] font-semibold text-foreground/80 uppercase tracking-wider">How to use:</span>
+                      <ul className="text-[11px] text-muted-foreground space-y-1 list-disc list-inside">
+                        <li>Click <strong className="text-zinc-200">New Workspace</strong> and add your project's terminals.</li>
+                        <li>Configure startup commands (<code className="text-[10px] text-primary">npm run dev</code>, <code className="text-[10px] text-primary">docker compose up</code>) and working directories.</li>
+                        <li>Launch in 1 click; seamlessly drag and swap panes or drag a terminal into its own tab.</li>
+                      </ul>
+                    </div>
+                  </div>
+                </Card>
+
+                {/* Server Hub & 24/7 Monitoring */}
+                <Card className="p-5 border border-white/[0.06] bg-card/60 backdrop-blur-xl rounded-2xl flex flex-col justify-between space-y-3">
+                  <div className="space-y-2.5">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-500/10 text-blue-400 border border-blue-500/20">
+                          <Server className="h-4 w-4" />
+                        </div>
+                        <div>
+                          <h4 className="text-sm font-bold text-foreground">Server Hub & Live Telemetry</h4>
+                          <span className="text-[10px] font-mono text-blue-400 font-medium">Agentless SSH Monitoring</span>
+                        </div>
+                      </div>
+                    </div>
+                    <p className="text-xs text-muted-foreground leading-relaxed">
+                      Manage remote VPS, EC2, and Linux servers with live CPU, RAM, Disk, and Network RX/TX telemetry without installing host agents. Stream live PM2, Docker, and systemd service logs.
+                    </p>
+                    <div className="space-y-1.5 pt-1 border-t border-white/[0.04]">
+                      <span className="text-[10px] font-semibold text-foreground/80 uppercase tracking-wider">How to use:</span>
+                      <ul className="text-[11px] text-muted-foreground space-y-1 list-disc list-inside">
+                        <li>Add servers with SSH credentials or encrypted keys from Key Vault.</li>
+                        <li>Organize servers with color-coded tags and folders.</li>
+                        <li>Enable <strong className="text-zinc-200">24/7 Live</strong> for continuous background health checks and metric charts.</li>
+                        <li>Click <strong className="text-zinc-200">Shell</strong>, <strong className="text-zinc-200">Charts</strong>, or <strong className="text-zinc-200">Logs</strong> for instant 1-click access.</li>
+                      </ul>
+                    </div>
+                  </div>
+                </Card>
+
+                {/* Macros Engine & Pipelines */}
+                <Card className="p-5 border border-white/[0.06] bg-card/60 backdrop-blur-xl rounded-2xl flex flex-col justify-between space-y-3">
+                  <div className="space-y-2.5">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                          <Zap className="h-4 w-4" />
+                        </div>
+                        <div>
+                          <h4 className="text-sm font-bold text-foreground">Macros Engine & Pipelines</h4>
+                          <span className="text-[10px] font-mono text-amber-400 font-medium">Automated Multi-Step Tasks</span>
+                        </div>
+                      </div>
+                    </div>
+                    <p className="text-xs text-muted-foreground leading-relaxed">
+                      Eliminate repetitive commands by creating reusable automated sequences with delay timings and error handling. Chain macros into Group Pipelines for complete zero-downtime deployment runs.
+                    </p>
+                    <div className="space-y-1.5 pt-1 border-t border-white/[0.04]">
+                      <span className="text-[10px] font-semibold text-foreground/80 uppercase tracking-wider">How to use:</span>
+                      <ul className="text-[11px] text-muted-foreground space-y-1 list-disc list-inside">
+                        <li>Click <strong className="text-zinc-200">+ Macro</strong> and add sequential shell commands.</li>
+                        <li>Choose <strong className="text-zinc-200">Interactive</strong> (live terminal output) or <strong className="text-zinc-200">Direct</strong> (quiet raw exec) mode.</li>
+                        <li>Group related macros into <strong className="text-zinc-200">Group Pipelines</strong> to run complex deployments in order.</li>
+                      </ul>
+                    </div>
+                  </div>
+                </Card>
+
+                {/* Hardware Encrypted Key Vault */}
+                <Card className="p-5 border border-white/[0.06] bg-card/60 backdrop-blur-xl rounded-2xl flex flex-col justify-between space-y-3">
+                  <div className="space-y-2.5">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                          <Shield className="h-4 w-4" />
+                        </div>
+                        <div>
+                          <h4 className="text-sm font-bold text-foreground">Encrypted SSH Key Vault</h4>
+                          <span className="text-[10px] font-mono text-emerald-400 font-medium">AES-256-GCM Zero Plaintext</span>
+                        </div>
+                      </div>
+                    </div>
+                    <p className="text-xs text-muted-foreground leading-relaxed">
+                      Secure, hardware-authenticated storage for OpenSSH, RSA, and Ed25519 private keys and credentials. Keys are encrypted at rest and only decrypted in volatile memory upon connection.
+                    </p>
+                    <div className="space-y-1.5 pt-1 border-t border-white/[0.04]">
+                      <span className="text-[10px] font-semibold text-foreground/80 uppercase tracking-wider">How to use:</span>
+                      <ul className="text-[11px] text-muted-foreground space-y-1 list-disc list-inside">
+                        <li>Store your private keys once in the Key Vault with optional passphrases.</li>
+                        <li>Select stored keys directly from any server configuration dropdown.</li>
+                        <li>Never expose plaintext credentials or loose <code className="text-[10px] text-emerald-400">.pem</code> files on disk.</li>
+                      </ul>
+                    </div>
+                  </div>
+                </Card>
+              </div>
             </div>
 
             {/* Architecture & Stack Card */}

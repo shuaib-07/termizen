@@ -6,7 +6,10 @@ import {
   ArrowUp,
   Check,
   ChevronRight,
+  ExternalLink,
+  Folder,
   Layers,
+  Pencil,
   Play,
   Plus,
   Save,
@@ -18,11 +21,13 @@ import {
   Zap,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Tooltip } from "@/components/ui/tooltip";
 import { Input } from "@/components/ui/input";
 import { Loader } from "@/components/Loader";
 import { AnimatedCombobox, type ComboboxItem } from "@/components/ui/combobox";
+import { FolderModal } from "@/components/folders/FolderModal";
 import { SPRING_PANEL, SPRING_SWAP } from "@/lib/ease";
-import { getFolderColor } from "@/lib/folderMetadata";
+import { addEmptyFolder, getEmptyFolders, getFolderColor } from "@/lib/folderMetadata";
 import { cn } from "@/lib/utils";
 import { HoverMarquee } from "@/components/ui/HoverMarquee";
 import type { MacroGroupSummary, MacroSummary, ProfileSummary } from "@/types";
@@ -43,6 +48,7 @@ export interface MacroSidesheetProps {
   onEditMacro: (id: number) => void;
   onDeleteMacro?: (id: number) => void;
   onSaveGroup: (name: string, folder?: string, macroIds?: number[]) => Promise<void>;
+  onEditGroup?: (group: MacroGroupSummary) => void;
   onDeleteGroup?: (id: number) => void;
   onNewMacro: (defaultFolder?: string) => void;
   onNewGroupMacro?: () => void;
@@ -67,9 +73,10 @@ export default function MacroSidesheet({
   onEditMacro,
   onDeleteMacro: _onDeleteMacro,
   onSaveGroup,
+  onEditGroup,
   onDeleteGroup,
   onNewMacro,
-  onNewGroupMacro: _onNewGroupMacro,
+  onNewGroupMacro,
   runningState,
 }: MacroSidesheetProps) {
   const [search, setSearch] = useState("");
@@ -79,6 +86,7 @@ export default function MacroSidesheet({
   const [saveGroupModalOpen, setSaveGroupModalOpen] = useState(false);
   const [newGroupName, setNewGroupName] = useState("");
   const [newGroupFolder, setNewGroupFolder] = useState("");
+  const [newFolderModalOpen, setNewFolderModalOpen] = useState(false);
   const [selectedTarget, setSelectedTarget] = useState<string>(
     isBoundToTerminal ? "" : activeProfileId ? `ssh:${activeProfileId}` : ""
   );
@@ -117,6 +125,12 @@ export default function MacroSidesheet({
 
     return [
       {
+        value: "new_tab",
+        label: "New Tab (Dedicated Session)",
+        icon: <ExternalLink className="h-3.5 w-3.5 text-emerald-400" />,
+        description: "Opens a fresh dedicated tab to execute",
+      },
+      {
         value: "",
         label: activeLabel,
         icon: <Terminal className="h-3.5 w-3.5 text-primary" />,
@@ -153,17 +167,29 @@ export default function MacroSidesheet({
 
 
 
-  // Extract unique folders
-  const allFolders = useMemo(() => {
-    const set = new Set<string>();
-    macros.forEach((m) => {
-      if (m.folder?.trim()) set.add(m.folder.trim());
-    });
-    macroGroups.forEach((g) => {
-      if (g.folder?.trim()) set.add(g.folder.trim());
-    });
-    return Array.from(set).sort((a, b) => a.localeCompare(b));
-  }, [macros, macroGroups]);
+  // Collect existing folders across all profiles, macros, groups, and metadata
+  const existingFolders = useMemo(() => {
+    return Array.from(
+      new Set([
+        ...profiles.map((p) => p.folder).filter((f): f is string => !!f && f.trim().length > 0),
+        ...macros.map((m) => m.folder).filter((f): f is string => !!f && f.trim().length > 0),
+        ...macroGroups.map((g) => g.folder).filter((f): f is string => !!f && f.trim().length > 0),
+        ...getEmptyFolders(),
+      ])
+    ).sort((a, b) => a.localeCompare(b));
+  }, [profiles, macros, macroGroups, newGroupFolder]);
+
+  const folderComboboxItems: ComboboxItem[] = useMemo(() => {
+    return existingFolders.map((f) => ({
+      value: f,
+      label: f,
+      color: getFolderColor(f),
+      icon: <Folder className="h-3.5 w-3.5" />,
+    }));
+  }, [existingFolders]);
+
+  // Extract unique folders across all servers, macros, groups, and empty folders
+  const allFolders = existingFolders;
 
   // Filter individual macros
   const filteredSingleMacros = useMemo(() => {
@@ -221,6 +247,9 @@ export default function MacroSidesheet({
 
   const handleSaveQueueAsGroup = async () => {
     if (!newGroupName.trim() || selectedMacroIds.length === 0) return;
+    if (newGroupFolder.trim() && !existingFolders.includes(newGroupFolder.trim())) {
+      addEmptyFolder(newGroupFolder.trim());
+    }
     await onSaveGroup(newGroupName.trim(), newGroupFolder.trim() || undefined, selectedMacroIds);
     setNewGroupName("");
     setNewGroupFolder("");
@@ -233,7 +262,8 @@ export default function MacroSidesheet({
   };
 
   return (
-    <AnimatePresence>
+    <>
+      <AnimatePresence>
       {isOpen && (
         <div className="fixed inset-0 z-50 flex justify-end pointer-events-none select-none">
           {/* Backdrop overlay */}
@@ -432,14 +462,15 @@ export default function MacroSidesheet({
                       <Save className="h-3 w-3 mr-1" />
                       Save as Group
                     </Button>
-                    <button
-                      type="button"
-                      onClick={clearQueue}
-                      className="text-[10px] text-muted-foreground hover:text-red-400 px-1 py-0.5 rounded transition-colors"
-                      title="Clear queue"
-                    >
-                      Clear
-                    </button>
+                    <Tooltip content="Clear queue" side="bottom">
+                      <button
+                        type="button"
+                        onClick={clearQueue}
+                        className="text-[10px] text-muted-foreground hover:text-red-400 px-1 py-0.5 rounded transition-colors"
+                      >
+                        Clear
+                      </button>
+                    </Tooltip>
                   </div>
                 </div>
 
@@ -523,12 +554,29 @@ export default function MacroSidesheet({
                   onChange={(e) => setNewGroupName(e.target.value)}
                   className="h-7 text-xs bg-zinc-900 border-white/[0.1]"
                 />
-                <Input
-                  placeholder="Folder (optional, e.g. Zoopify)"
-                  value={newGroupFolder}
-                  onChange={(e) => setNewGroupFolder(e.target.value)}
-                  className="h-7 text-xs bg-zinc-900 border-white/[0.1]"
-                />
+                <div className="space-y-1">
+                  <label className="text-[11px] font-medium text-muted-foreground">Folder (Optional)</label>
+                  <AnimatedCombobox
+                    value={newGroupFolder}
+                    onChange={(val) => {
+                      setNewGroupFolder(val);
+                      if (val.trim() && !existingFolders.includes(val.trim())) {
+                        addEmptyFolder(val.trim());
+                      }
+                    }}
+                    items={folderComboboxItems}
+                    placeholder="Select folder..."
+                    searchPlaceholder="Search or type new folder..."
+                    allowCreate
+                    createPrefix="Create new folder"
+                    clearLabel="No Folder (Root)"
+                    clearValue=""
+                    icon={<Folder className="h-3.5 w-3.5" />}
+                    className="w-full text-xs"
+                    onCreateNew={() => setNewFolderModalOpen(true)}
+                    createNewText="Create new folder..."
+                  />
+                </div>
                 <div className="flex justify-end gap-1.5 pt-1">
                   <Button variant="ghost" size="sm" onClick={() => setSaveGroupModalOpen(false)} className="h-6 text-xs">
                     Cancel
@@ -582,15 +630,37 @@ export default function MacroSidesheet({
                         <Play className="h-2.5 w-2.5 mr-1 fill-current" />
                         Run
                       </Button>
-                      {onDeleteGroup && (
+                      <Tooltip content="Run in New Tab" side="top">
                         <button
                           type="button"
-                          onClick={() => onDeleteGroup(group.id)}
-                          className="p-1 text-muted-foreground/60 hover:text-red-400 rounded opacity-0 group-hover:opacity-100 transition-opacity"
-                          title="Delete Group"
+                          onClick={() => onRunGroupMacro(group, "new_tab")}
+                          disabled={runningState?.isRunning}
+                          className="p-1 text-muted-foreground/60 hover:text-emerald-400 rounded opacity-0 group-hover:opacity-100 transition-opacity"
                         >
-                          <Trash2 className="h-3 w-3" />
+                          <ExternalLink className="h-3 w-3" />
                         </button>
+                      </Tooltip>
+                      {onEditGroup && (
+                        <Tooltip content="Edit Group" side="top">
+                          <button
+                            type="button"
+                            onClick={() => onEditGroup(group)}
+                            className="p-1 text-muted-foreground/60 hover:text-foreground rounded opacity-0 group-hover:opacity-100 transition-opacity"
+                          >
+                            <Pencil className="h-3 w-3" />
+                          </button>
+                        </Tooltip>
+                      )}
+                      {onDeleteGroup && (
+                        <Tooltip content="Delete Group" side="top">
+                          <button
+                            type="button"
+                            onClick={() => onDeleteGroup(group.id)}
+                            className="p-1 text-muted-foreground/60 hover:text-red-400 rounded opacity-0 group-hover:opacity-100 transition-opacity"
+                          >
+                            <Trash2 className="h-3 w-3" />
+                          </button>
+                        </Tooltip>
                       )}
                     </div>
                   </div>
@@ -618,25 +688,26 @@ export default function MacroSidesheet({
                     >
                       <div className="flex items-center gap-2 truncate">
                         {/* Queue Toggle Checkbox */}
-                        <button
-                          type="button"
-                          onClick={() => toggleSelectMacro(macro.id)}
-                          className={cn(
-                            "flex h-4 w-4 items-center justify-center rounded border transition-colors cursor-pointer",
-                            isQueued
-                              ? "bg-amber-400 border-amber-400 text-black"
-                              : "border-muted-foreground/40 hover:border-muted-foreground bg-background/50"
-                          )}
-                          title={isQueued ? "Remove from queue" : "Add to queue"}
-                        >
-                          {isQueued && <Check className="h-3 w-3 stroke-[3]" />}
-                        </button>
+                        <Tooltip content={isQueued ? "Remove from queue" : "Add to queue"} side="top">
+                          <button
+                            type="button"
+                            onClick={() => toggleSelectMacro(macro.id)}
+                            className={cn(
+                              "flex h-4 w-4 items-center justify-center rounded border transition-colors cursor-pointer",
+                              isQueued
+                                ? "bg-amber-400 border-amber-400 text-black"
+                                : "border-muted-foreground/40 hover:border-muted-foreground bg-background/50"
+                            )}
+                          >
+                            {isQueued && <Check className="h-3 w-3 stroke-[3]" />}
+                          </button>
+                        </Tooltip>
 
                         <div className="truncate flex-1 min-w-0">
                           <HoverMarquee text={macro.name} className="font-medium text-xs text-foreground" />
                           <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
-                            <span className="uppercase text-[9px] px-1 py-0.2 rounded bg-white/[0.05]">
-                              {macro.runMode}
+                            <span className="text-[9px] font-semibold tracking-wide px-1.5 py-0.2 rounded bg-white/[0.05] text-zinc-300 border border-white/[0.08]">
+                              {macro.runMode === "pty" ? "Interactive" : "Direct"}
                             </span>
                             <span>{macro.stepCount} steps</span>
                             {macro.folder && (
@@ -660,17 +731,28 @@ export default function MacroSidesheet({
                           <Play className="h-2.5 w-2.5 mr-1" />
                           Run
                         </Button>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            onClose();
-                            onEditMacro(macro.id);
-                          }}
-                          className="p-1 text-muted-foreground/60 hover:text-foreground rounded transition-colors"
-                          title="Edit Macro"
-                        >
-                          <ChevronRight className="h-3.5 w-3.5" />
-                        </button>
+                        <Tooltip content="Run in New Tab" side="top">
+                          <button
+                            type="button"
+                            onClick={() => onRunSingleMacro(macro, "new_tab")}
+                            disabled={runningState?.isRunning}
+                            className="p-1 text-muted-foreground/60 hover:text-emerald-400 rounded opacity-0 group-hover:opacity-100 transition-opacity"
+                          >
+                            <ExternalLink className="h-3 w-3" />
+                          </button>
+                        </Tooltip>
+                        <Tooltip content="Edit Macro" side="top">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              onClose();
+                              onEditMacro(macro.id);
+                            }}
+                            className="p-1 text-muted-foreground/60 hover:text-foreground rounded transition-colors"
+                          >
+                            <ChevronRight className="h-3.5 w-3.5" />
+                          </button>
+                        </Tooltip>
                       </div>
                     </div>
                   );
@@ -700,21 +782,48 @@ export default function MacroSidesheet({
             <span className="text-[11px] text-muted-foreground">
               {macros.length} single • {macroGroups.length} groups
             </span>
-            <Button
-              size="sm"
-              onClick={() => {
-                onClose();
-                onNewMacro(folderFilter !== "all" ? folderFilter : undefined);
-              }}
-              className="h-7 text-xs bg-primary hover:bg-primary/90 text-primary-foreground"
-            >
-              <Plus className="h-3.5 w-3.5 mr-1" />
-              New Macro
-            </Button>
+            <div className="flex items-center gap-1.5">
+              {onNewGroupMacro && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => {
+                    onClose();
+                    onNewGroupMacro();
+                  }}
+                  className="h-7 text-xs border-amber-400/30 text-amber-300 hover:bg-amber-400/10"
+                >
+                  <Layers className="h-3 w-3 mr-1" />
+                  New Group
+                </Button>
+              )}
+              <Button
+                size="sm"
+                onClick={() => {
+                  onClose();
+                  onNewMacro(folderFilter !== "all" ? folderFilter : undefined);
+                }}
+                className="h-7 text-xs bg-primary hover:bg-primary/90 text-primary-foreground"
+              >
+                <Plus className="h-3.5 w-3.5 mr-1" />
+                New Macro
+              </Button>
+            </div>
           </div>
         </motion.div>
       </div>
       )}
     </AnimatePresence>
+    <FolderModal
+      isOpen={newFolderModalOpen}
+      onClose={() => setNewFolderModalOpen(false)}
+      existingFolders={existingFolders}
+      onSave={async (_, newName, color) => {
+        addEmptyFolder(newName, color);
+        setNewGroupFolder(newName);
+        setNewFolderModalOpen(false);
+      }}
+    />
+  </>
   );
 }

@@ -206,7 +206,7 @@ export default function TabBar({
 
   return (
     <MotionConfig reducedMotion="user">
-      <div className="flex items-center gap-1 rounded-xl border border-white/[0.04] bg-card/60 p-1.5">
+      <div data-tabbar-drop-zone="true" className="flex items-center gap-1 rounded-xl border border-white/[0.04] bg-card/60 p-1.5">
         {onToggleSidebar && (
           <Tooltip content={sidebarOpen ? "Collapse sidebar" : "Expand sidebar"} hotkey="Ctrl+B" side="bottom">
             <Button

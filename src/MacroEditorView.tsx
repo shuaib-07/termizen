@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Loader } from "@/components/Loader";
-import { Folder, Plus } from "lucide-react";
+import { Folder } from "lucide-react";
 import { FolderModal } from "@/components/folders/FolderModal";
 import { AnimatedCombobox, type ComboboxItem } from "@/components/ui/combobox";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -122,17 +122,7 @@ export default function MacroEditorView({
 
         <div className="grid grid-cols-2 gap-3">
           <div className="flex flex-col gap-1">
-            <div className="flex items-center justify-between">
-              <label className="text-xs text-muted-foreground">Assign to folder (optional)</label>
-              <button
-                type="button"
-                onClick={() => setNewFolderModalOpen(true)}
-                className="text-[11px] text-primary hover:underline flex items-center gap-1 cursor-pointer font-medium"
-              >
-                <Plus className="h-3 w-3" />
-                <span>New Folder</span>
-              </button>
-            </div>
+            <label className="text-xs text-muted-foreground">Assign to folder (optional)</label>
             <AnimatedCombobox
               value={folder}
               onChange={(val) => {
@@ -151,7 +141,7 @@ export default function MacroEditorView({
               icon={<Folder className="h-3.5 w-3.5" />}
               className="w-full"
               onCreateNew={() => setNewFolderModalOpen(true)}
-              createNewText="+ Create new folder..."
+              createNewText="Create new folder..."
             />
             <p className="text-xs text-muted-foreground/70">Groups this macro under this folder for categorization.</p>
           </div>

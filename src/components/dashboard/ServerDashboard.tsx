@@ -10,10 +10,11 @@ import {
   FileText,
   Folder,
   HardDrive,
-  Key,
   Layers,
+  LayoutDashboard,
   Pencil,
   Pin,
+  Play,
   Plus,
   RefreshCw,
   Search,
@@ -31,7 +32,7 @@ import { AnimatedBadge } from "@/components/AnimatedBadge";
 import { Tooltip } from "@/components/ui/tooltip";
 import { getFolderColor } from "@/lib/folderMetadata";
 import { fetchServerMetrics, getCachedMetrics, setCachedMetrics } from "@/sessions";
-import type { MacroSummary, ProfileSummary, ServerHubSubView, ServerMetrics } from "@/types";
+import type { MacroSummary, ProfileSummary, ServerHubSubView, ServerMetrics, WorkspaceSummary } from "@/types";
 
 function formatSpeed(bytesPerSec: number) {
   if (!bytesPerSec || bytesPerSec === 0) return "0 B/s";
@@ -489,6 +490,7 @@ function ServerCard({
 export default function ServerDashboard({
   profiles,
   macros,
+  workspaces = [],
   onOpenProfile,
   onEditProfile,
   onDeleteProfile,
@@ -496,10 +498,16 @@ export default function ServerDashboard({
   onTogglePin,
   onToggleBgMonitoring,
   onRunMacro,
-  onOpenKeyVault,
+  onOpenKeyVault: _onOpenKeyVault,
+  onLaunchWorkspace,
+  onNewWorkspace,
+  onEditWorkspace,
+  onOpenWorkspacesTab: _onOpenWorkspacesTab,
+  viewMode = "dashboard",
 }: {
   profiles: ProfileSummary[];
   macros: MacroSummary[];
+  workspaces?: WorkspaceSummary[];
   onOpenProfile: (profile: ProfileSummary, subView?: ServerHubSubView) => void;
   onEditProfile: (profile: ProfileSummary) => void;
   onDeleteProfile: (id: number) => void;
@@ -507,7 +515,12 @@ export default function ServerDashboard({
   onTogglePin: (id: number, pinned: boolean) => void;
   onToggleBgMonitoring: (id: number, enabled: boolean) => void;
   onRunMacro: (profileId: number, macroId: number) => void;
-  onOpenKeyVault: () => void;
+  onOpenKeyVault?: () => void;
+  onLaunchWorkspace?: (workspace: WorkspaceSummary) => void;
+  onNewWorkspace?: () => void;
+  onEditWorkspace?: (workspace: WorkspaceSummary) => void;
+  onOpenWorkspacesTab?: () => void;
+  viewMode?: "dashboard" | "servers";
 }) {
   const [search, setSearch] = useState("");
   const [filterFolder, setFilterFolder] = useState<string>("all");
@@ -534,33 +547,247 @@ export default function ServerDashboard({
 
   return (
     <div className="flex flex-col h-full overflow-y-auto p-4 sm:p-6 space-y-6 bg-transparent">
-      {/* Top Welcome & Summary Header */}
+      {/* Top Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-border/40 pb-4">
         <div>
           <div className="flex items-center gap-2.5">
             <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 text-primary border border-primary/20 shrink-0">
-              <Server className="h-5 w-5" />
+              {viewMode === "dashboard" ? (
+                <LayoutDashboard className="h-5 w-5" />
+              ) : (
+                <Server className="h-5 w-5" />
+              )}
             </div>
             <div className="min-w-0">
-              <h1 className="text-lg font-bold text-foreground truncate">Server Manager</h1>
+              <h1 className="text-lg font-bold text-foreground truncate">
+                {viewMode === "dashboard" ? "Dashboard" : "Servers"}
+              </h1>
               <p className="text-xs text-muted-foreground">
-                Monitor VPS & EC2 servers live, stream logs, and run automated macros.
+                {viewMode === "dashboard"
+                  ? "Unified overview of your workspace environments and remote servers."
+                  : "Monitor VPS & EC2 servers live, stream logs, and run automated macros."}
               </p>
             </div>
           </div>
         </div>
 
-        <div className="flex items-center gap-2 shrink-0">
-          <Button variant="outline" size="sm" onClick={onOpenKeyVault} className="gap-1.5 text-xs">
-            <Key className="h-3.5 w-3.5 text-amber-400" /> Key Vault
-          </Button>
-          <Button size="sm" onClick={onAddServer} className="gap-1.5 shadow-sm font-medium">
-            <Plus className="h-4 w-4" /> Add Server
-          </Button>
-        </div>
+        {viewMode !== "dashboard" && (
+          <div className="flex items-center gap-2 shrink-0">
+            <Button size="sm" onClick={onAddServer} className="gap-1.5 shadow-sm font-medium">
+              <Plus className="h-4 w-4" /> Add Server
+            </Button>
+          </div>
+        )}
       </div>
 
-      {/* Empty State */}
+      {/* Workspaces Section (Only shown in Dashboard view) */}
+      {viewMode === "dashboard" && (
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary/10 text-primary border border-primary/20">
+                <Layers className="h-4 w-4" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h2 className="text-sm font-bold text-foreground">Workspaces</h2>
+                  <span className="rounded-full bg-primary/10 border border-primary/20 px-2 py-0.2 text-[10px] font-mono text-primary font-semibold">
+                    {workspaces?.length || 0}
+                  </span>
+                </div>
+                <p className="text-[11px] text-muted-foreground">
+                  Multi-terminal grid environments ready for 1-click launch
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2">
+              {onNewWorkspace && (
+                <Button
+                  size="sm"
+                  onClick={onNewWorkspace}
+                  className="h-7 text-xs gap-1.5"
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                  <span>New Workspace</span>
+                </Button>
+              )}
+            </div>
+          </div>
+
+          {workspaces && workspaces.length > 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+              {workspaces.map((ws) => {
+                const folderColor = ws.folder ? getFolderColor(ws.folder) : undefined;
+                return (
+                  <Card
+                    key={ws.id}
+                    onClick={() => onLaunchWorkspace?.(ws)}
+                    className="group relative flex flex-col justify-between p-3.5 rounded-xl border border-white/[0.06] bg-card/60 hover:bg-card hover:border-primary/40 transition-all cursor-pointer select-none"
+                  >
+                    <div>
+                      {/* Header */}
+                      <div className="flex items-start justify-between gap-2 mb-2">
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2 mb-0.5">
+                            <span className="font-bold text-sm text-foreground truncate group-hover:text-primary transition-colors">
+                              {ws.name}
+                            </span>
+                            {ws.folder && (
+                              <span
+                                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium border shrink-0"
+                                style={{
+                                  backgroundColor: folderColor ? `${folderColor}18` : "var(--muted)",
+                                  borderColor: folderColor ? `${folderColor}40` : "var(--border)",
+                                  color: folderColor || "var(--muted-foreground)",
+                                }}
+                              >
+                                <Folder className="h-2.5 w-2.5" />
+                                <span>{ws.folder}</span>
+                              </span>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
+                            <span className="capitalize font-medium text-zinc-400">
+                              {ws.layoutMode === "tabs" ? "Separate Tabs" : `Split Grid (${ws.gridPreset || "auto"})`}
+                            </span>
+                            <span>•</span>
+                            <span>{ws.terminals.length} {ws.terminals.length === 1 ? "terminal" : "terminals"}</span>
+                          </div>
+                        </div>
+
+                        {onEditWorkspace && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onEditWorkspace(ws);
+                            }}
+                            className="h-6 w-6 text-muted-foreground hover:text-foreground opacity-0 group-hover:opacity-100 transition-opacity"
+                            title="Edit Workspace"
+                          >
+                            <Pencil className="h-3 w-3" />
+                          </Button>
+                        )}
+                      </div>
+
+                      {/* Terminals summary chips */}
+                      <div className="flex flex-wrap gap-1.5 my-2">
+                        {ws.terminals.slice(0, 4).map((t, idx) => (
+                          <span
+                            key={idx}
+                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-zinc-900/80 border border-white/[0.04] text-[10px] text-zinc-300 font-mono truncate max-w-[140px]"
+                          >
+                            {t.targetKind === "ssh" ? (
+                              <Server className="h-2.5 w-2.5 text-cyan-400 shrink-0" />
+                            ) : (
+                              <Terminal className="h-2.5 w-2.5 text-amber-400 shrink-0" />
+                            )}
+                            <span className="truncate">{t.title}</span>
+                          </span>
+                        ))}
+                        {ws.terminals.length > 4 && (
+                          <span className="px-1.5 py-0.5 rounded-md bg-white/[0.04] text-[10px] text-muted-foreground">
+                            +{ws.terminals.length - 4} more
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Launch CTA bar */}
+                    <div className="pt-2 border-t border-white/[0.04] flex items-center justify-between">
+                      <span className="text-[11px] text-muted-foreground group-hover:text-foreground transition-colors font-medium">
+                        Click to launch
+                      </span>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-6 px-2 text-xs font-semibold text-primary group-hover:bg-primary/10 group-hover:border group-hover:border-primary/20 rounded-md gap-1"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onLaunchWorkspace?.(ws);
+                        }}
+                      >
+                        <Play className="h-3 w-3 fill-primary text-primary" />
+                        <span>Launch</span>
+                      </Button>
+                    </div>
+                  </Card>
+                );
+              })}
+            </div>
+          ) : (
+            <Card className="flex flex-col items-center justify-center p-6 text-center border-dashed border-white/[0.08] bg-card/30 rounded-xl space-y-3">
+              <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10 text-primary border border-primary/20">
+                <Layers className="h-6 w-6" />
+              </div>
+              <div className="space-y-1 max-w-md">
+                <h3 className="text-sm font-semibold text-foreground">No Workspaces Configured Yet</h3>
+                <p className="text-xs text-muted-foreground leading-relaxed">
+                  Workspaces group your project's terminals (e.g. database tunnel, backend API, Vite frontend) into a 1-click launch configuration with up to 6 resizable split panes.
+                </p>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 w-full max-w-lg text-left text-[11px] my-1">
+                <div className="p-2.5 rounded-lg border border-white/[0.04] bg-white/[0.02]">
+                  <span className="font-mono text-[9px] text-primary font-bold block uppercase">1. Add Terminals</span>
+                  <span className="text-muted-foreground">Local shells or remote SSH sessions.</span>
+                </div>
+                <div className="p-2.5 rounded-lg border border-white/[0.04] bg-white/[0.02]">
+                  <span className="font-mono text-[9px] text-primary font-bold block uppercase">2. Auto-Run</span>
+                  <span className="text-muted-foreground">Startup scripts & working directory.</span>
+                </div>
+                <div className="p-2.5 rounded-lg border border-white/[0.04] bg-white/[0.02]">
+                  <span className="font-mono text-[9px] text-primary font-bold block uppercase">3. Launch</span>
+                  <span className="text-muted-foreground">1-click split grid or tab execution.</span>
+                </div>
+              </div>
+
+              {onNewWorkspace && (
+                <Button size="sm" onClick={onNewWorkspace} className="h-7 text-xs gap-1.5 mt-1 font-semibold">
+                  <Plus className="h-3.5 w-3.5" />
+                  <span>Create Workspace</span>
+                </Button>
+              )}
+            </Card>
+          )}
+        </div>
+      )}
+
+      {/* Horizontal Divider between Workspaces and Servers in Dashboard */}
+      {viewMode === "dashboard" && (
+        <div className="border-t border-border/40" />
+      )}
+
+      {/* Servers Section Header (Only in Dashboard view to match Workspaces) */}
+      {viewMode === "dashboard" && (
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary/10 text-primary border border-primary/20">
+              <Server className="h-4 w-4" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h2 className="text-sm font-bold text-foreground">Servers</h2>
+                <span className="rounded-full bg-primary/10 border border-primary/20 px-2 py-0.2 text-[10px] font-mono text-primary font-semibold">
+                  {profiles.length}
+                </span>
+              </div>
+              <p className="text-[11px] text-muted-foreground">
+                Monitor VPS & EC2 servers live, stream logs, and run automated macros
+              </p>
+            </div>
+          </div>
+
+          <Button size="sm" onClick={onAddServer} className="h-7 text-xs gap-1.5">
+            <Plus className="h-3.5 w-3.5" />
+            <span>Add Server</span>
+          </Button>
+        </div>
+      )}
+
+      {/* Servers Content */}
       {profiles.length === 0 ? (
         <Card className="flex flex-col items-center justify-center p-8 sm:p-12 text-center border-dashed border-border/80 bg-card/30 space-y-4 rounded-xl">
           <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-primary/10 text-primary border border-primary/20 shadow-inner">
@@ -657,22 +884,45 @@ export default function ServerDashboard({
             )}
           </div>
 
-          {/* Servers Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 min-[1150px]:grid-cols-3 gap-4">
-            {filteredProfiles.map((p) => (
-              <ServerCard
-                key={p.id}
-                profile={p}
-                macros={macros}
-                onOpen={onOpenProfile}
-                onEdit={onEditProfile}
-                onDelete={onDeleteProfile}
-                onTogglePin={onTogglePin}
-                onToggleBgMonitoring={(cur) => handleToggleBg(p.id, cur)}
-                onRunMacro={onRunMacro}
-              />
-            ))}
-          </div>
+          {/* Servers Grid or Filtered Empty State */}
+          {filteredProfiles.length === 0 ? (
+            <Card className="flex flex-col items-center justify-center p-8 text-center border-dashed border-white/[0.08] bg-card/30 rounded-xl space-y-2">
+              <Search className="h-7 w-7 text-muted-foreground/50" />
+              <div className="space-y-0.5">
+                <h3 className="text-xs font-semibold text-foreground">No servers match your filter</h3>
+                <p className="text-[11px] text-muted-foreground">
+                  Try adjusting your search query or folder selection.
+                </p>
+              </div>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => {
+                  setSearch("");
+                  setFilterFolder("all");
+                }}
+                className="h-7 text-xs"
+              >
+                Clear Filters
+              </Button>
+            </Card>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 min-[1150px]:grid-cols-3 gap-4">
+              {filteredProfiles.map((p) => (
+                <ServerCard
+                  key={p.id}
+                  profile={p}
+                  macros={macros}
+                  onOpen={onOpenProfile}
+                  onEdit={onEditProfile}
+                  onDelete={onDeleteProfile}
+                  onTogglePin={onTogglePin}
+                  onToggleBgMonitoring={(cur) => handleToggleBg(p.id, cur)}
+                  onRunMacro={onRunMacro}
+                />
+              ))}
+            </div>
+          )}
         </div>
       )}
 

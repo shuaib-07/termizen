@@ -41,6 +41,10 @@ export interface NativeDeleteProps {
    * Disable the button
    */
   disabled?: boolean;
+  /**
+   * Callback when expanded state changes
+   */
+  onExpandedChange?: (expanded: boolean) => void;
 }
 
 // Idle state is icon-only (just the red trash can); clicking morphs it into
@@ -83,28 +87,41 @@ const smoothSpring = {
 // in a whole new headless-component library just to render a <button> here
 // would've been a dependency with no payoff. Swapped for our own
 // @/components/ui/button, which renders identically.
-export function NativeDelete({ onConfirm, onDelete, buttonText = "Delete", confirmText = "Confirm", size = "md", showIcon = true, className, disabled = false }: NativeDeleteProps) {
+export function NativeDelete({
+  onConfirm,
+  onDelete,
+  buttonText = "Delete",
+  confirmText = "Confirm",
+  size = "md",
+  showIcon = true,
+  className,
+  disabled = false,
+  onExpandedChange,
+}: NativeDeleteProps) {
   const [isExpanded, setIsExpanded] = useState(false);
 
   const handleDeleteClick = () => {
     if (!disabled) {
       setIsExpanded(true);
       onConfirm();
+      onExpandedChange?.(true);
     }
   };
 
   const handleConfirm = () => {
     onDelete();
     setIsExpanded(false);
+    onExpandedChange?.(false);
   };
 
   const handleCancel = () => {
     setIsExpanded(false);
+    onExpandedChange?.(false);
   };
 
   return (
     <MotionConfig transition={smoothSpring}>
-      <motion.div layout className={cn("relative inline-flex items-center gap-2", className)}>
+      <motion.div layout className={cn("relative inline-flex items-center gap-1.5 shrink-0", className)}>
         {/* Main Delete/Confirm button */}
         <motion.div layout whileHover={!disabled ? { scale: 1.02 } : undefined} whileTap={!disabled ? { scale: 0.98 } : undefined}>
           <Button

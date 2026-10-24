@@ -13,7 +13,7 @@ import {
 import { Checkbox } from "@/components/ui/checkbox";
 import { AnimatedCombobox, type ComboboxItem } from "@/components/ui/combobox";
 import { Loader } from "@/components/Loader";
-import { Folder, Play, Plus, Server } from "lucide-react";
+import { Folder, Play, Server } from "lucide-react";
 import { FolderModal } from "@/components/folders/FolderModal";
 import { cn } from "@/lib/utils";
 import { getFolderColor, getEmptyFolders, addEmptyFolder } from "@/lib/folderMetadata";
@@ -49,7 +49,7 @@ export function MacroModal({
   const [haltOnError, setHaltOnError] = useState(true);
   const [folder, setFolder] = useState("");
   const [newFolderModalOpen, setNewFolderModalOpen] = useState(false);
-  const [targetEnv, setTargetEnv] = useState<"active" | "local" | "server">("active");
+  const [targetEnv, setTargetEnv] = useState<"new_tab" | "active" | "local" | "server">("new_tab");
   const [localShell, setLocalShell] = useState<"powershell" | "cmd" | "wsl">("powershell");
   const [selectedProfileId, setSelectedProfileId] = useState<number | undefined>(undefined);
   const [stepsText, setStepsText] = useState("");
@@ -104,6 +104,10 @@ export function MacroModal({
       if (editing.profileId != null) {
         setTargetEnv("server");
         setSelectedProfileId(editing.profileId);
+        setLocalShell("powershell");
+      } else if (editing.shell === "new_tab") {
+        setTargetEnv("new_tab");
+        setSelectedProfileId(undefined);
         setLocalShell("powershell");
       } else if (
         editing.shell === "powershell" ||
@@ -189,6 +193,9 @@ export function MacroModal({
       } else if (targetEnv === "local") {
         resolvedProfileId = undefined;
         resolvedShell = localShell;
+      } else if (targetEnv === "new_tab") {
+        resolvedProfileId = undefined;
+        resolvedShell = "new_tab";
       } else {
         resolvedProfileId = undefined;
         resolvedShell = "active";
@@ -256,27 +263,22 @@ export function MacroModal({
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="exec">Exec (own connection, per-profile)</SelectItem>
-                    <SelectItem value="pty">Live PTY (types into open tab)</SelectItem>
+                    <SelectItem value="pty">Type into Terminal (Interactive)</SelectItem>
+                    <SelectItem value="exec">Run in Background (Direct)</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
+              <p className="text-[10px] text-muted-foreground mt-1">
+                {runMode === "pty"
+                  ? "Interactive: Types commands visibly into the terminal session as if you typed them."
+                  : "Direct: Runs silently in the background without typing into the prompt."}
+              </p>
             </div>
           </div>
 
           <div className="grid grid-cols-2 gap-3">
             <div className="col-span-2">
-              <div className="flex items-center justify-between">
-                <label className="text-xs font-medium text-muted-foreground">Folder (Optional)</label>
-                <button
-                  type="button"
-                  onClick={() => setNewFolderModalOpen(true)}
-                  className="text-[11px] text-primary hover:underline flex items-center gap-1 cursor-pointer font-medium"
-                >
-                  <Plus className="h-3 w-3" />
-                  <span>New Folder</span>
-                </button>
-              </div>
+              <label className="text-xs font-medium text-muted-foreground">Folder (Optional)</label>
               <div className="mt-1">
                 <AnimatedCombobox
                   value={folder}
@@ -296,7 +298,7 @@ export function MacroModal({
                   icon={<Folder className="h-3.5 w-3.5" />}
                   className="w-full text-xs"
                   onCreateNew={() => setNewFolderModalOpen(true)}
-                  createNewText="+ Create new folder..."
+                  createNewText="Create new folder..."
                 />
               </div>
             </div>
@@ -312,6 +314,7 @@ export function MacroModal({
               <div className="relative flex items-center rounded-lg bg-zinc-900/80 p-0.5 border border-white/[0.08]">
                 {(
                   [
+                    { id: "new_tab", label: "New Tab" },
                     { id: "active", label: "Active Tab" },
                     { id: "local", label: "Local Machine" },
                     { id: "server", label: "Specific Server" },
@@ -346,6 +349,21 @@ export function MacroModal({
 
             {/* Conditional Environment Options */}
             <AnimatePresence mode="wait">
+              {targetEnv === "new_tab" && (
+                <motion.div
+                  key="new-tab-settings"
+                  initial={{ opacity: 0, y: -4 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -4 }}
+                  transition={{ duration: 0.15 }}
+                  className="px-3 py-2 rounded-lg bg-white/[0.02] border border-white/[0.06]"
+                >
+                  <p className="text-[11px] text-muted-foreground">
+                    Always opens a fresh separate terminal tab to execute commands, leaving current tabs untouched.
+                  </p>
+                </motion.div>
+              )}
+
               {targetEnv === "local" && (
                 <motion.div
                   key="local-settings"

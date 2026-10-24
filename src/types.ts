@@ -170,11 +170,22 @@ export interface WorkspaceTerminalDef {
   startupCommand?: string;
 }
 
+export type GridPreset =
+  | "auto"
+  | "1x2"
+  | "2x1"
+  | "1+2"
+  | "2x2"
+  | "2x3"
+  | "3x2"
+  | "3x1";
+
 export interface WorkspaceSummary {
   id: number;
   name: string;
   folder?: string;
   layoutMode: "tabs" | "split";
+  gridPreset?: GridPreset;
   terminals: WorkspaceTerminalDef[];
 }
 
@@ -216,15 +227,29 @@ export interface Pane {
   content: TabContentState;
 }
 
-// Plan calls for fixed 50/50 splits, not an arbitrary nested pane tree --
-// one level (single or a 2-way split) is what's specced.
+export type PaneNode =
+  | {
+      kind: "leaf";
+      pane: Pane;
+    }
+  | {
+      kind: "split";
+      id: string;
+      direction: "row" | "column";
+      sizes: [number, number]; // Percentage split, e.g. [50, 50]
+      children: [PaneNode, PaneNode];
+    };
+
 export type PaneLayout =
   | { kind: "single"; pane: Pane }
-  | { kind: "split"; direction: "row" | "column"; panes: [Pane, Pane] };
+  | { kind: "split"; direction: "row" | "column"; panes: [Pane, Pane] }
+  | { kind: "tree"; root: PaneNode };
 
 export interface Tab {
   id: string;
   layout: PaneLayout;
+  activePaneId?: string;
+  maximizedPaneId?: string;
   isLocked?: boolean;
 }
 

@@ -18,6 +18,7 @@ import type { ServerHubSubView } from "./types";
 import { NativeNestedList, ListItem } from "@/components/NativeNestedList";
 import { NativeDelete } from "@/components/NativeDelete";
 import { Button } from "@/components/ui/button";
+import { Tooltip } from "@/components/ui/tooltip";
 import {
   ContextMenuContent,
   ContextMenuItem,
@@ -54,73 +55,87 @@ function ProfileActions({
   onOpenNewTab?: (profile: ProfileSummary) => void;
   onOpenMacroSidesheet?: (profileId: number) => void;
 }) {
+  const [isDeleting, setIsDeleting] = useState(false);
+
   return (
     <div
-      className="flex items-center pl-6 pt-0.5 pb-1"
+      className="flex items-center pl-6 pt-0.5 pb-1 max-w-full"
       onClick={(e) => e.stopPropagation()}
     >
-      <div className="flex items-center gap-0.5 rounded-lg bg-zinc-950/80 border border-white/[0.08] p-0.5 shadow-sm backdrop-blur-md">
-        {profile.kind === "ssh" && (
+      <div className="flex items-center gap-0.5 rounded-lg bg-zinc-950/80 border border-white/[0.08] p-0.5 shadow-sm backdrop-blur-md transition-all">
+        {!isDeleting && profile.kind === "ssh" && (
           <>
             {onOpenNewTab && (
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-6 w-6 rounded-md text-muted-foreground hover:text-primary hover:bg-white/[0.08] cursor-pointer"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onOpenNewTab(profile);
-                }}
-                title="Open in New Terminal Tab"
-              >
-                <Plus className="h-3.5 w-3.5" />
-              </Button>
+              <Tooltip content="Open in New Terminal Tab" side="top">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-6 w-6 rounded-md text-muted-foreground hover:text-primary hover:bg-white/[0.08] cursor-pointer"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onOpenNewTab(profile);
+                  }}
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                </Button>
+              </Tooltip>
             )}
 
             {onOpenMacroSidesheet && (
+              <Tooltip content="Macros for this server" side="top">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-6 w-6 rounded-md text-muted-foreground hover:text-amber-400 hover:bg-amber-400/10 cursor-pointer"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onOpenMacroSidesheet(profile.id);
+                  }}
+                >
+                  <Zap className="h-3.5 w-3.5 text-amber-400/90" />
+                </Button>
+              </Tooltip>
+            )}
+
+            <Tooltip content="Live Status Charts" side="top">
               <Button
                 variant="ghost"
                 size="icon"
-                className="h-6 w-6 rounded-md text-muted-foreground hover:text-amber-400 hover:bg-amber-400/10 cursor-pointer"
+                className="h-6 w-6 rounded-md text-muted-foreground hover:text-cyan-400 hover:bg-cyan-400/10 cursor-pointer"
                 onClick={(e) => {
                   e.stopPropagation();
-                  onOpenMacroSidesheet(profile.id);
+                  onOpenSubView(profile, "monitor");
                 }}
-                title="Macros for this server"
               >
-                <Zap className="h-3.5 w-3.5 text-amber-400/90" />
+                <Activity className="h-3.5 w-3.5" />
               </Button>
-            )}
+            </Tooltip>
 
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-6 w-6 rounded-md text-muted-foreground hover:text-cyan-400 hover:bg-cyan-400/10 cursor-pointer"
-              onClick={(e) => {
-                e.stopPropagation();
-                onOpenSubView(profile, "monitor");
-              }}
-              title="Live Status Charts"
-            >
-              <Activity className="h-3.5 w-3.5" />
-            </Button>
-
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-6 w-6 rounded-md text-muted-foreground hover:text-emerald-400 hover:bg-emerald-400/10 cursor-pointer"
-              onClick={(e) => {
-                e.stopPropagation();
-                onOpenSubView(profile, "logs");
-              }}
-              title="Live Service Logs"
-            >
-              <FileText className="h-3.5 w-3.5" />
-            </Button>
+            <Tooltip content="Live Service Logs" side="top">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-6 w-6 rounded-md text-muted-foreground hover:text-emerald-400 hover:bg-emerald-400/10 cursor-pointer"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onOpenSubView(profile, "logs");
+                }}
+              >
+                <FileText className="h-3.5 w-3.5" />
+              </Button>
+            </Tooltip>
+            <div className="h-3 w-[1px] bg-white/[0.08] mx-0.5" />
           </>
         )}
-        <div className="h-3 w-[1px] bg-white/[0.08] mx-0.5" />
-        <NativeDelete size="sm" onConfirm={() => {}} onDelete={() => onDelete(profile.id)} />
+        <NativeDelete
+          size="sm"
+          onConfirm={() => setIsDeleting(true)}
+          onDelete={() => {
+            setIsDeleting(false);
+            onDelete(profile.id);
+          }}
+          onExpandedChange={setIsDeleting}
+        />
       </div>
     </div>
   );
@@ -331,18 +346,19 @@ export default function ProfileSidebar({
         icon: <Folder className="h-3.5 w-3.5" style={{ color: color || "var(--muted-foreground)" }} />,
         children: folderProfiles.map(toProfileItem),
         actions: (
-          <button
-            type="button"
-            className="flex h-5 w-5 items-center justify-center rounded text-muted-foreground/60 hover:bg-white/[0.08] hover:text-foreground cursor-pointer transition-colors"
-            onClick={(e) => {
-              e.stopPropagation();
-              setEditingFolder(folder);
-              setFolderModalOpen(true);
-            }}
-            title="Customize Folder"
-          >
-            <MoreHorizontal className="h-3 w-3" />
-          </button>
+          <Tooltip content="Customize Folder" side="right">
+            <button
+              type="button"
+              className="flex h-5 w-5 items-center justify-center rounded text-muted-foreground/60 hover:bg-white/[0.08] hover:text-foreground cursor-pointer transition-colors"
+              onClick={(e) => {
+                e.stopPropagation();
+                setEditingFolder(folder);
+                setFolderModalOpen(true);
+              }}
+            >
+              <MoreHorizontal className="h-3 w-3" />
+            </button>
+          </Tooltip>
         ),
         contextMenu: (
           <ContextMenuContent ariaLabel={`Actions for ${folder}`}>

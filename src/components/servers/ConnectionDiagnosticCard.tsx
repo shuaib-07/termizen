@@ -13,6 +13,7 @@ import {
   X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Tooltip } from "@/components/ui/tooltip";
 import { AnimatedBadge } from "@/components/AnimatedBadge";
 
 export interface ServerInfoMeta {
@@ -275,15 +276,16 @@ export function ConnectionDiagnosticCard({
           </div>
 
           {onCloseTab && (
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-7 w-7 text-muted-foreground hover:text-foreground -mr-1 -mt-1"
-              onClick={onCloseTab}
-              title="Close tab"
-            >
-              <X className="h-4 w-4" />
-            </Button>
+            <Tooltip content="Close tab" side="bottom">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7 text-muted-foreground hover:text-foreground -mr-1 -mt-1 cursor-pointer"
+                onClick={onCloseTab}
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </Tooltip>
           )}
         </div>
 
@@ -291,24 +293,25 @@ export function ConnectionDiagnosticCard({
         <div className="mt-4 rounded-xl bg-black/40 border border-red-500/20 p-3 relative group">
           <div className="flex items-center justify-between text-[11px] font-semibold text-red-400/90 mb-1.5 uppercase tracking-wider">
             <span>SSH / OS Socket Error</span>
-            <button
-              type="button"
-              onClick={handleCopyError}
-              className="flex items-center gap-1 text-[11px] font-mono text-muted-foreground hover:text-foreground bg-white/[0.05] hover:bg-white/[0.1] px-2 py-0.5 rounded cursor-pointer transition-colors"
-              title="Copy raw error string"
-            >
-              {copiedError ? (
-                <>
-                  <Check className="h-3 w-3 text-emerald-400" />
-                  <span className="text-emerald-400 font-semibold">Copied!</span>
-                </>
-              ) : (
+            <Tooltip content="Copy raw error string" side="top">
+              <button
+                type="button"
+                onClick={handleCopyError}
+                className="flex items-center gap-1 text-[11px] font-mono text-muted-foreground hover:text-foreground bg-white/[0.05] hover:bg-white/[0.1] px-2 py-0.5 rounded cursor-pointer transition-colors"
+              >
+                {copiedError ? (
+                  <>
+                    <Check className="h-3 w-3 text-emerald-400" />
+                    <span className="text-emerald-400 font-semibold">Copied!</span>
+                  </>
+                ) : (
                 <>
                   <Copy className="h-3 w-3" />
                   <span>Copy Error</span>
                 </>
               )}
             </button>
+            </Tooltip>
           </div>
           <pre className="text-xs font-mono text-red-300/90 whitespace-pre-wrap break-all select-text font-normal leading-relaxed">
             {error}
@@ -343,18 +346,19 @@ export function ConnectionDiagnosticCard({
                   {item.command && (
                     <div className="mt-1.5 flex items-center justify-between rounded-lg bg-black/50 border border-white/[0.06] px-2 py-1 font-mono text-[11px] text-zinc-300">
                       <span className="truncate select-text">{item.command}</span>
-                      <button
-                        type="button"
-                        onClick={() => handleCopyCommand(item.command!)}
-                        className="ml-2 shrink-0 text-muted-foreground hover:text-foreground cursor-pointer p-0.5"
-                        title="Copy command"
-                      >
-                        {copiedCmd === item.command ? (
-                          <Check className="h-3 w-3 text-emerald-400" />
-                        ) : (
-                          <Copy className="h-3 w-3" />
-                        )}
-                      </button>
+                      <Tooltip content={copiedCmd === item.command ? "Copied!" : "Copy command"} side="top">
+                        <button
+                          type="button"
+                          onClick={() => handleCopyCommand(item.command!)}
+                          className="ml-2 shrink-0 text-muted-foreground hover:text-foreground cursor-pointer p-0.5"
+                        >
+                          {copiedCmd === item.command ? (
+                            <Check className="h-3 w-3 text-emerald-400" />
+                          ) : (
+                            <Copy className="h-3 w-3" />
+                          )}
+                        </button>
+                      </Tooltip>
                     </div>
                   )}
                 </div>
@@ -468,15 +472,16 @@ export function ConnectionErrorBanner({
           Retry
         </Button>
         {onCloseTab && (
-          <Button
-            size="sm"
-            variant="ghost"
-            className="h-6 w-6 p-0 text-red-400 hover:text-white hover:bg-red-500/20"
-            onClick={onCloseTab}
-            title="Close tab"
-          >
-            <X className="h-3 w-3" />
-          </Button>
+          <Tooltip content="Close tab" side="bottom">
+            <Button
+              size="sm"
+              variant="ghost"
+              className="h-6 w-6 p-0 text-red-400 hover:text-white hover:bg-red-500/20 cursor-pointer"
+              onClick={onCloseTab}
+            >
+              <X className="h-3 w-3" />
+            </Button>
+          </Tooltip>
         )}
       </div>
     </div>

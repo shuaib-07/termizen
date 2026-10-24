@@ -31,6 +31,7 @@ export interface AnimatedComboboxProps {
   className?: string;
   disabled?: boolean;
   icon?: React.ReactNode;
+  placement?: "auto" | "top" | "bottom";
 }
 
 export function AnimatedCombobox({
@@ -43,18 +44,55 @@ export function AnimatedCombobox({
   allowCreate = false,
   createPrefix = "Create new folder",
   onCreateNew,
-  createNewText = "+ Create a new server...",
+  createNewText = "Create a new server...",
   clearLabel,
   clearValue = "",
   className,
   disabled = false,
   icon,
+  placement = "auto",
 }: AnimatedComboboxProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [actualPlacement, setActualPlacement] = useState<"top" | "bottom">(
+    placement === "top" ? "top" : "bottom"
+  );
   const containerRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const comboboxId = useId();
+
+  // Determine actual dropdown placement (auto drop-up if constrained at bottom)
+  useEffect(() => {
+    if (!isOpen) return;
+    if (placement === "top") {
+      setActualPlacement("top");
+      return;
+    }
+    if (placement === "bottom") {
+      setActualPlacement("bottom");
+      return;
+    }
+    // placement === "auto"
+    if (containerRef.current) {
+      const rect = containerRef.current.getBoundingClientRect();
+      const windowHeight = window.innerHeight;
+      const scrollParent = containerRef.current.closest(".overflow-y-auto, [role='dialog']");
+      let spaceBelow = windowHeight - rect.bottom;
+      let spaceAbove = rect.top;
+
+      if (scrollParent) {
+        const parentRect = scrollParent.getBoundingClientRect();
+        spaceBelow = Math.min(spaceBelow, parentRect.bottom - rect.bottom);
+        spaceAbove = Math.min(spaceAbove, rect.top - parentRect.top);
+      }
+
+      if (spaceBelow < 250 && spaceAbove > spaceBelow) {
+        setActualPlacement("top");
+      } else {
+        setActualPlacement("bottom");
+      }
+    }
+  }, [isOpen, placement]);
 
   // Find the selected item
   const selectedItem = items.find(
@@ -203,12 +241,15 @@ export function AnimatedCombobox({
         {isOpen && (
           <motion.div
             id={comboboxId}
-            initial={{ opacity: 0, y: -6, scale: 0.98 }}
+            initial={{ opacity: 0, y: actualPlacement === "top" ? 6 : -6, scale: 0.98 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: -4, scale: 0.98 }}
+            exit={{ opacity: 0, y: actualPlacement === "top" ? 4 : -4, scale: 0.98 }}
             transition={SPRING_PANEL}
-            style={{ transformOrigin: "top center" }}
-            className="absolute left-0 right-0 top-full mt-1.5 z-50 rounded-xl border border-white/[0.08] bg-zinc-950/95 backdrop-blur-2xl shadow-2xl p-1.5 min-w-[200px]"
+            style={{ transformOrigin: actualPlacement === "top" ? "bottom center" : "top center" }}
+            className={cn(
+              "absolute left-0 right-0 z-50 rounded-xl border border-white/[0.08] bg-zinc-950/95 backdrop-blur-2xl shadow-2xl p-1.5 min-w-[200px]",
+              actualPlacement === "top" ? "bottom-full mb-1.5" : "top-full mt-1.5"
+            )}
           >
             {/* Search input inside dropdown */}
             <div className="relative mb-1 px-0.5">
@@ -321,7 +362,7 @@ export function AnimatedCombobox({
                     className="w-full flex items-center gap-2 px-2.5 py-1.5 text-xs rounded-lg text-primary hover:bg-primary/15 transition-colors text-left font-medium cursor-pointer"
                   >
                     <Plus className="h-3.5 w-3.5 shrink-0" />
-                    <span>{createNewText}</span>
+                    <span>{createNewText.replace(/^\+\s*/, "")}</span>
                   </button>
                 </div>
               )}

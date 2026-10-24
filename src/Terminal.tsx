@@ -4,6 +4,7 @@ import { FitAddon } from "@xterm/addon-fit";
 import { listen } from "@tauri-apps/api/event";
 import { AnimatePresence, motion } from "framer-motion";
 import { Check, ClipboardPaste, Copy, X } from "lucide-react";
+import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import "@xterm/xterm/css/xterm.css";
 import {
@@ -39,6 +40,7 @@ export interface TerminalProps {
   onExit?: () => void;
   onStatusChange?: (status: TerminalStatus) => void;
   initialCommands?: string[];
+  onInitialCommandsExecuted?: () => void;
   serverInfo?: ServerInfoMeta;
   onEditServer?: () => void;
   onCloseTab?: () => void;
@@ -47,7 +49,7 @@ export interface TerminalProps {
 const Terminal = forwardRef<
   TerminalHandle,
   TerminalProps
->(({ session, onExit, onStatusChange, initialCommands, serverInfo, onEditServer, onCloseTab }, ref) => {
+>(({ session, onExit, onStatusChange, initialCommands, onInitialCommandsExecuted, serverInfo, onEditServer, onCloseTab }, ref) => {
     const outerRef = useRef<HTMLDivElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
     const termRef = useRef<XTerm | null>(null);
@@ -270,6 +272,7 @@ const Terminal = forwardRef<
                 await new Promise((r) => setTimeout(r, 120));
               }
             }
+            onInitialCommandsExecuted?.();
           }
         };
 
@@ -466,48 +469,51 @@ const Terminal = forwardRef<
               onMouseDown={(e) => e.stopPropagation()}
             >
               {/* Copy Button */}
-              <button
-                type="button"
-                onClick={handleCopy}
-                className={cn(
-                  "flex items-center gap-1.5 px-2.5 py-1 rounded-lg transition-all font-medium text-xs cursor-pointer",
-                  copied
-                    ? "bg-emerald-500/15 text-emerald-400 border border-emerald-500/30"
-                    : "hover:bg-muted/70 text-foreground active:scale-95"
-                )}
-                title="Copy selection (Ctrl+C)"
-              >
-                {copied ? <Check className="h-3.5 w-3.5 text-emerald-400" /> : <Copy className="h-3.5 w-3.5" />}
-                <span>{copied ? "Copied!" : "Copy"}</span>
-              </button>
+              <Tooltip content="Copy selection" hotkey="Ctrl+C" side="top">
+                <button
+                  type="button"
+                  onClick={handleCopy}
+                  className={cn(
+                    "flex items-center gap-1.5 px-2.5 py-1 rounded-lg transition-all font-medium text-xs cursor-pointer",
+                    copied
+                      ? "bg-emerald-500/15 text-emerald-400 border border-emerald-500/30"
+                      : "hover:bg-muted/70 text-foreground active:scale-95"
+                  )}
+                >
+                  {copied ? <Check className="h-3.5 w-3.5 text-emerald-400" /> : <Copy className="h-3.5 w-3.5" />}
+                  <span>{copied ? "Copied!" : "Copy"}</span>
+                </button>
+              </Tooltip>
 
               <div className="w-[1px] h-3.5 bg-border/60 mx-0.5" />
 
               {/* Paste Button */}
-              <button
-                type="button"
-                onClick={handlePaste}
-                className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg hover:bg-muted/70 text-foreground transition-all font-medium text-xs active:scale-95 cursor-pointer"
-                title="Paste from clipboard (Ctrl+V)"
-              >
-                <ClipboardPaste className="h-3.5 w-3.5 text-primary" />
-                <span>Paste</span>
-              </button>
+              <Tooltip content="Paste from clipboard" hotkey="Ctrl+V" side="top">
+                <button
+                  type="button"
+                  onClick={handlePaste}
+                  className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg hover:bg-muted/70 text-foreground transition-all font-medium text-xs active:scale-95 cursor-pointer"
+                >
+                  <ClipboardPaste className="h-3.5 w-3.5 text-primary" />
+                  <span>Paste</span>
+                </button>
+              </Tooltip>
 
               <div className="w-[1px] h-3.5 bg-border/60 mx-0.5" />
 
               {/* Dismiss Button */}
-              <button
-                type="button"
-                onClick={() => {
-                  termRef.current?.clearSelection();
-                  setSelectionMenu(null);
-                }}
-                className="p-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/70 transition-colors cursor-pointer"
-                title="Deselect"
-              >
-                <X className="h-3.5 w-3.5" />
-              </button>
+              <Tooltip content="Deselect" side="top">
+                <button
+                  type="button"
+                  onClick={() => {
+                    termRef.current?.clearSelection();
+                    setSelectionMenu(null);
+                  }}
+                  className="p-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/70 transition-colors cursor-pointer"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              </Tooltip>
             </motion.div>
           )}
         </AnimatePresence>

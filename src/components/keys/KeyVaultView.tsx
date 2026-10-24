@@ -124,16 +124,45 @@ export default function KeyVaultView({
 
       {/* Keys List */}
       {keys.length === 0 ? (
-        <Card className="flex flex-col items-center justify-center p-12 text-center border-dashed border-border/80 bg-card/30 rounded-xl space-y-3">
-          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-muted text-muted-foreground mb-1">
-            <Shield className="h-6 w-6 text-muted-foreground" />
+        <Card className="flex flex-col items-center justify-center p-8 sm:p-12 text-center border-dashed border-border/80 bg-card/30 rounded-2xl space-y-4 max-w-2xl mx-auto my-auto">
+          <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-primary/10 text-primary border border-primary/20 shadow-inner">
+            <Shield className="h-8 w-8" />
           </div>
-          <h3 className="font-semibold text-foreground">No SSH Keys in Vault</h3>
-          <p className="text-xs text-muted-foreground max-w-sm">
-            Add your `.pem`, `id_rsa`, or `id_ed25519` private keys once and reuse them effortlessly across any server profile.
-          </p>
-          <Button size="sm" onClick={() => setShowAddModal(true)}>
-            <Plus className="mr-1.5 h-3.5 w-3.5" /> Add First Key
+          <div className="space-y-1.5 max-w-md">
+            <h2 className="text-base font-bold text-foreground">No SSH Keys in Vault Yet</h2>
+            <p className="text-xs text-muted-foreground leading-relaxed">
+              Store your OpenSSH, RSA, and Ed25519 private keys securely with AES-256-GCM encryption and reuse them across any server profile.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 w-full text-left my-2">
+            <div className="p-3 rounded-xl border border-white/[0.06] bg-white/[0.02] space-y-1">
+              <div className="text-[10px] font-mono font-bold text-emerald-400 uppercase">AES-256-GCM</div>
+              <div className="text-xs font-semibold text-foreground">Encrypted at Rest</div>
+              <p className="text-[11px] text-muted-foreground leading-snug">
+                Keys are never stored in plaintext on disk.
+              </p>
+            </div>
+
+            <div className="p-3 rounded-xl border border-white/[0.06] bg-white/[0.02] space-y-1">
+              <div className="text-[10px] font-mono font-bold text-primary uppercase">1-Click Assign</div>
+              <div className="text-xs font-semibold text-foreground">Reusable Keys</div>
+              <p className="text-[11px] text-muted-foreground leading-snug">
+                Link one key to multiple VPS or EC2 servers effortlessly.
+              </p>
+            </div>
+
+            <div className="p-3 rounded-xl border border-white/[0.06] bg-white/[0.02] space-y-1">
+              <div className="text-[10px] font-mono font-bold text-blue-400 uppercase">In-Memory Auth</div>
+              <div className="text-xs font-semibold text-foreground">Zero Exposure</div>
+              <p className="text-[11px] text-muted-foreground leading-snug">
+                Decrypted only in volatile memory during handshakes.
+              </p>
+            </div>
+          </div>
+
+          <Button size="default" onClick={() => setShowAddModal(true)} className="gap-2 shadow-sm font-semibold">
+            <Plus className="h-4 w-4" /> Add Your First Key
           </Button>
         </Card>
       ) : (

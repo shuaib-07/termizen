@@ -655,34 +655,33 @@ export default function ServiceLogViewer({
               />
               <span className="truncate max-w-[170px]">{s.name}</span>
               {isPaused ? (
-                <span
-                  className="h-1.5 w-1.5 rounded-full bg-amber-400 flex-shrink-0"
-                  title="Stream paused"
-                />
+                <Tooltip content="Stream paused" side="top">
+                  <span className="h-1.5 w-1.5 rounded-full bg-amber-400 flex-shrink-0" />
+                </Tooltip>
               ) : (
-                <span
-                  className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse flex-shrink-0"
-                  title="Stream running"
-                />
+                <Tooltip content="Stream running" side="top">
+                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse flex-shrink-0" />
+                </Tooltip>
               )}
-              <span
-                role="button"
-                tabIndex={0}
-                title="Remove stream"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleDeleteService(s.id);
-                }}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" || e.key === " ") {
+              <Tooltip content="Remove stream" side="top">
+                <span
+                  role="button"
+                  tabIndex={0}
+                  onClick={(e) => {
                     e.stopPropagation();
                     handleDeleteService(s.id);
-                  }
-                }}
-                className="ml-1 p-0.5 rounded-sm text-muted-foreground/40 hover:text-destructive hover:bg-destructive/10 transition-colors cursor-pointer"
-              >
-                <X className="h-3 w-3" />
-              </span>
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.stopPropagation();
+                      handleDeleteService(s.id);
+                    }
+                  }}
+                  className="ml-1 p-0.5 rounded-sm text-muted-foreground/40 hover:text-destructive hover:bg-destructive/10 transition-colors cursor-pointer"
+                >
+                  <X className="h-3 w-3" />
+                </span>
+              </Tooltip>
             </div>
           </ContextMenuTrigger>
           <ContextMenuContent ariaLabel={`Service actions for ${s.name}`}>

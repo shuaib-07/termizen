@@ -1,4 +1,4 @@
-import { Sparkles, Terminal, Activity, ShieldCheck, Zap, Globe, Cpu, CheckCircle2, ExternalLink } from "lucide-react";
+import { Sparkles, Terminal, Activity, Zap, Globe, CheckCircle2, ExternalLink, Layers } from "lucide-react";
 import { Modal } from "@/components/ui/modal";
 import { Button } from "@/components/ui/button";
 import { openExternalUrl, APP_VERSION, type UpdateInfo } from "@/lib/updater";
@@ -12,34 +12,34 @@ interface WhatsNewModalProps {
 export function WhatsNewModal({ isOpen, onClose, latestUpdate }: WhatsNewModalProps) {
   const HIGHLIGHTS = [
     {
-      icon: Terminal,
-      title: "Real Windows 11 Mica & Fluid Tabs",
-      description: "Native OS-composited DWM Mica dark backdrop with 0% opacity root and zero glow. Multi-tab terminal with 50/50 horizontal and vertical split screen.",
-    },
-    {
-      icon: Activity,
-      title: "Server Hub & Live Status Charts",
-      description: "Real-time CPU core graphs, memory allocations, disk mounts, and network throughput charts streamed over SSH without installing any agent.",
-    },
-    {
-      icon: Globe,
-      title: "Live Web Traffic Analytics",
-      description: "Live access log analytics for Nginx and Apache with real-time status code distribution, top endpoints, request rates, and client IP detection.",
-    },
-    {
-      icon: Cpu,
-      title: "Service Log Tail Streaming",
-      description: "Automated discovery and live log streaming for PM2 apps, Docker containers, and systemd services with instant ANSI color rendering.",
-    },
-    {
-      icon: ShieldCheck,
-      title: "Hardware Encrypted Key Vault",
-      description: "Local private key and passphrase storage safeguarded with authenticated AES-256-GCM encryption in an embedded SQLite database.",
+      icon: Layers,
+      title: "Workspaces & Multi-Terminal Stacks",
+      description: "Define multi-terminal environment stacks to launch in separate tabs or unified split-screen grids with optional automated startup macros.",
     },
     {
       icon: Zap,
-      title: "Macro Script Automation",
-      description: "PTY and background exec automation macros with halt-on-error policies, folder organization, and profile-specific scoping.",
+      title: "Dedicated Macros View & Pipelines",
+      description: "Full-page macro cockpit with live search, execution mode filters (Interactive PTY vs Direct exec), folder tags, and sequential multi-macro Group Pipelines.",
+    },
+    {
+      icon: Globe,
+      title: "Traffic Health & Scanner Detection",
+      description: "Plain-English server diagnosis banners, automatic 4xx/5xx security bot scanner detection, and live access log quick filter chips.",
+    },
+    {
+      icon: Terminal,
+      title: "Pane Drag-Drop & Tab Extraction",
+      description: "Intuitive drag handle to swap or dock terminal panes in any tree configuration, plus one-click pop-out to extract any split pane into a new dedicated tab.",
+    },
+    {
+      icon: Sparkles,
+      title: "Spring-Animated Tooltips & UI Polish",
+      description: "Collision-aware, portal-rendered spring tooltips across all buttons, standardized rectangular folder badges, and dynamic theme accent alignment.",
+    },
+    {
+      icon: Activity,
+      title: "Automated Launch Update Alerts",
+      description: "Optional startup update checks with instant update notification modal and direct one-click installer downloads from GitHub releases.",
     },
   ];
 

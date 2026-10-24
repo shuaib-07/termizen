@@ -27,6 +27,7 @@ const TabContent = forwardRef<
     onOpenProfile: (profile: ProfileSummary) => void;
     onEditProfile?: (profile: ProfileSummary) => void;
     onAddNewServer: () => void;
+    onClearInitialCommands?: () => void;
     isVisible?: boolean;
   }
 >(
@@ -47,6 +48,7 @@ const TabContent = forwardRef<
       onOpenProfile,
       onEditProfile,
       onAddNewServer,
+      onClearInitialCommands,
     },
     ref
   ) => {
@@ -96,6 +98,7 @@ const TabContent = forwardRef<
             onExit={onExit}
             onStatusChange={onStatusChange}
             initialCommands={initialCommands}
+            onInitialCommandsExecuted={onClearInitialCommands}
             serverInfo={{
               profileId: profile?.id ?? (content.kind === "ssh" ? content.profileId : undefined),
               name: profile?.name ?? (content.kind === "ssh" ? content.profileName : undefined),

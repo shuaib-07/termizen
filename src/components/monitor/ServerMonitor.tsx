@@ -719,21 +719,23 @@ export default function ServerMonitor({
                     <span>
                       {showPublicIp ? publicIpValue : "•••••••••••••"}
                     </span>
-                    <button
-                      onClick={() => setShowPublicIp((v) => !v)}
-                      className="p-1 text-muted-foreground hover:text-primary transition-colors"
-                      title={showPublicIp ? "Hide IP" : "Reveal IP"}
-                    >
-                      {showPublicIp ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
-                    </button>
-                    {showPublicIp && (
+                    <Tooltip content={showPublicIp ? "Hide IP" : "Reveal IP"} side="top">
                       <button
-                        onClick={copyPublicIp}
-                        className="p-1 text-muted-foreground hover:text-emerald-400 transition-colors"
-                        title="Copy IP"
+                        onClick={() => setShowPublicIp((v) => !v)}
+                        className="p-1 text-muted-foreground hover:text-primary transition-colors cursor-pointer"
                       >
-                        {copiedIp ? <Check className="h-3.5 w-3.5 text-emerald-400" /> : <Copy className="h-3.5 w-3.5" />}
+                        {showPublicIp ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
                       </button>
+                    </Tooltip>
+                    {showPublicIp && (
+                      <Tooltip content={copiedIp ? "Copied!" : "Copy IP"} side="top">
+                        <button
+                          onClick={copyPublicIp}
+                          className="p-1 text-muted-foreground hover:text-emerald-400 transition-colors cursor-pointer"
+                        >
+                          {copiedIp ? <Check className="h-3.5 w-3.5 text-emerald-400" /> : <Copy className="h-3.5 w-3.5" />}
+                        </button>
+                      </Tooltip>
                     )}
                   </div>
                 </div>

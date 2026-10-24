@@ -1,8 +1,9 @@
 import { useState, useMemo, useEffect } from "react";
 import { motion } from "framer-motion";
-import { Folder, Layers, Plus, Server, Terminal, Trash2 } from "lucide-react";
+import { Folder, Layers, Plus, Server, Terminal, Trash2, Zap } from "lucide-react";
 import { Modal } from "@/components/ui/modal";
 import { Button } from "@/components/ui/button";
+import { Tooltip } from "@/components/ui/tooltip";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -14,8 +15,9 @@ import {
 import { AnimatedCombobox, type ComboboxItem } from "@/components/ui/combobox";
 import { FolderModal } from "@/components/folders/FolderModal";
 import { getFolderColor, getEmptyFolders, addEmptyFolder } from "@/lib/folderMetadata";
+import { getMacroSteps } from "@/sessions";
 import { cn } from "@/lib/utils";
-import type { ProfileSummary, WorkspaceSummary, WorkspaceTerminalDef } from "@/types";
+import type { GridPreset, MacroSummary, ProfileSummary, WorkspaceSummary, WorkspaceTerminalDef } from "@/types";
 
 export interface WorkspaceModalProps {
   isOpen: boolean;
@@ -25,10 +27,12 @@ export interface WorkspaceModalProps {
     name: string;
     folder?: string;
     layoutMode: "tabs" | "split";
+    gridPreset?: GridPreset;
     terminals: WorkspaceTerminalDef[];
   }) => Promise<void>;
   editingWorkspace?: WorkspaceSummary | null;
   profiles: ProfileSummary[];
+  macros?: MacroSummary[];
 }
 
 export default function WorkspaceModal({
@@ -37,11 +41,13 @@ export default function WorkspaceModal({
   onSave,
   editingWorkspace,
   profiles,
+  macros = [],
 }: WorkspaceModalProps) {
   const [name, setName] = useState("");
   const [folder, setFolder] = useState("");
   const [newFolderModalOpen, setNewFolderModalOpen] = useState(false);
   const [layoutMode, setLayoutMode] = useState<"tabs" | "split">("tabs");
+  const [gridPreset, setGridPreset] = useState<GridPreset>("auto");
   const [terminals, setTerminals] = useState<WorkspaceTerminalDef[]>([
     {
       position: 0,
@@ -59,6 +65,7 @@ export default function WorkspaceModal({
       setName(editingWorkspace.name);
       setFolder(editingWorkspace.folder || "");
       setLayoutMode(editingWorkspace.layoutMode);
+      setGridPreset(editingWorkspace.gridPreset || "auto");
       setTerminals(
         editingWorkspace.terminals.length > 0
           ? editingWorkspace.terminals
@@ -77,26 +84,11 @@ export default function WorkspaceModal({
       setName("");
       setFolder("");
       setLayoutMode("tabs");
+      setGridPreset("auto");
       setTerminals([
         {
           position: 0,
-          title: "DB Tunnel / Service",
-          targetKind: "local",
-          shell: "powershell",
-          cwd: "",
-          startupCommand: "",
-        },
-        {
-          position: 1,
-          title: "Backend API",
-          targetKind: "local",
-          shell: "powershell",
-          cwd: "",
-          startupCommand: "",
-        },
-        {
-          position: 2,
-          title: "Frontend Dev",
+          title: "",
           targetKind: "local",
           shell: "powershell",
           cwd: "",
@@ -105,6 +97,45 @@ export default function WorkspaceModal({
       ]);
     }
   }, [editingWorkspace, isOpen]);
+
+  const applyMacroToTerminal = async (index: number, macroId: number) => {
+    const m = macros.find((mac) => mac.id === macroId);
+    if (!m) return;
+    try {
+      const steps = await getMacroSteps(m.id);
+      updateTerminal(index, {
+        title: terminals[index]?.title?.trim() ? terminals[index].title : m.name,
+        startupCommand: steps.join("\n"),
+        targetKind: m.profileId ? "ssh" : "local",
+        profileId: m.profileId ?? undefined,
+        shell: m.shell || "powershell",
+      });
+    } catch (e) {
+      console.warn("Failed to load macro steps:", e);
+    }
+  };
+
+  const addTerminalFromMacro = async (macroId: number) => {
+    const m = macros.find((mac) => mac.id === macroId);
+    if (!m) return;
+    try {
+      const steps = await getMacroSteps(m.id);
+      setTerminals((prev) => [
+        ...prev,
+        {
+          position: prev.length,
+          title: m.name,
+          targetKind: m.profileId ? "ssh" : "local",
+          profileId: m.profileId ?? undefined,
+          shell: m.shell || "powershell",
+          cwd: "",
+          startupCommand: steps.join("\n"),
+        },
+      ]);
+    } catch (e) {
+      console.warn("Failed to load macro steps:", e);
+    }
+  };
 
   const existingFolders = useMemo(() => {
     return Array.from(
@@ -171,6 +202,7 @@ export default function WorkspaceModal({
         name: name.trim(),
         folder: folder.trim() || undefined,
         layoutMode,
+        gridPreset: layoutMode === "split" ? gridPreset : undefined,
         terminals,
       });
       onClose();
@@ -197,14 +229,6 @@ export default function WorkspaceModal({
           <div className="space-y-1">
             <div className="flex items-center justify-between">
               <label className="text-[11px] font-medium text-muted-foreground">Folder Group (Optional)</label>
-              <button
-                type="button"
-                onClick={() => setNewFolderModalOpen(true)}
-                className="text-[11px] text-primary hover:underline flex items-center gap-1 cursor-pointer font-medium"
-              >
-                <Plus className="h-3 w-3" />
-                <span>New Folder</span>
-              </button>
             </div>
             <AnimatedCombobox
               value={folder}
@@ -223,7 +247,7 @@ export default function WorkspaceModal({
               icon={<Folder className="h-3.5 w-3.5" />}
               className="w-full"
               onCreateNew={() => setNewFolderModalOpen(true)}
-              createNewText="+ Create new folder..."
+              createNewText="Create new folder..."
             />
           </div>
         </div>
@@ -279,10 +303,50 @@ export default function WorkspaceModal({
                 <Terminal className="h-4 w-4" />
               </div>
               <div>
-                <div className="font-semibold text-xs text-foreground">Split Panes</div>
-                <div className="text-[10px] text-muted-foreground">Opens terminals side-by-side in 1 tab</div>
+                <div className="font-semibold text-xs text-foreground">Split Panes (Grid)</div>
+                <div className="text-[10px] text-muted-foreground">Up to 6 resizable terminals in 1 tab</div>
               </div>
             </button>
+
+            {layoutMode === "split" && (
+              <div className="col-span-2 pt-1">
+                <label className="text-[11px] font-medium text-muted-foreground block mb-1.5">
+                  Grid Preset (Up to 6 terminals in 1 tab)
+                </label>
+                <div className="grid grid-cols-4 gap-1.5">
+                  {(
+                    [
+                      { id: "auto", label: "Auto Grid", desc: "Adaptive 1-6" },
+                      { id: "2x2", label: "2x2 Quad", desc: "4 Panes" },
+                      { id: "2x3", label: "2x3 Grid", desc: "6 Panes" },
+                      { id: "1+2", label: "1 + 2 Main", desc: "3 Panes" },
+                      { id: "1x2", label: "Side-by-Side", desc: "2 Columns" },
+                      { id: "2x1", label: "Stacked", desc: "2 Rows" },
+                      { id: "3x1", label: "3 Columns", desc: "3 Columns" },
+                      { id: "3x2", label: "3x2 Grid", desc: "6 Panes" },
+                    ] as const
+                  ).map((p) => {
+                    const isSelected = gridPreset === p.id;
+                    return (
+                      <button
+                        key={p.id}
+                        type="button"
+                        onClick={() => setGridPreset(p.id)}
+                        className={cn(
+                          "relative px-2 py-1.5 rounded-lg border text-left transition-colors cursor-pointer",
+                          isSelected
+                            ? "bg-primary/10 border-primary text-foreground font-semibold shadow-xs"
+                            : "bg-card/30 border-white/[0.06] text-muted-foreground hover:border-white/[0.12] hover:text-foreground"
+                        )}
+                      >
+                        <div className="text-[11px] leading-tight font-medium">{p.label}</div>
+                        <div className="text-[9px] text-muted-foreground">{p.desc}</div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
           </div>
         </div>
 
@@ -292,10 +356,32 @@ export default function WorkspaceModal({
             <label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
               Terminals to Launch ({terminals.length})
             </label>
-            <Button size="sm" variant="outline" onClick={addTerminal} className="h-6 px-2 text-[11px]">
-              <Plus className="h-3 w-3 mr-1" />
-              Add Terminal
-            </Button>
+            <div className="flex items-center gap-1.5">
+              {macros.length > 0 && (
+                <Select
+                  value=""
+                  onValueChange={(val) => {
+                    if (val) addTerminalFromMacro(Number(val));
+                  }}
+                >
+                  <SelectTrigger className="h-6 px-2 text-[11px] bg-amber-400/10 border border-amber-400/30 text-amber-300 hover:bg-amber-400/20 w-auto gap-1">
+                    <Zap className="h-3 w-3" />
+                    <span>+ From Macro</span>
+                  </SelectTrigger>
+                  <SelectContent>
+                    {macros.map((m) => (
+                      <SelectItem key={m.id} value={String(m.id)}>
+                        {m.name} {m.folder ? `(${m.folder})` : ""}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+              <Button size="sm" variant="outline" onClick={addTerminal} className="h-6 px-2 text-[11px]">
+                <Plus className="h-3 w-3 mr-1" />
+                Add Terminal
+              </Button>
+            </div>
           </div>
 
           <div className="max-h-64 overflow-y-auto space-y-2.5 pr-1 scrollbar-thin">
@@ -308,11 +394,31 @@ export default function WorkspaceModal({
                   <div className="flex items-center gap-2 flex-1">
                     <span className="font-mono text-[10px] text-muted-foreground">{index + 1}.</span>
                     <Input
-                      placeholder="Terminal Name"
+                      placeholder={`Terminal ${index + 1} (e.g. Backend API, DB Tunnel)`}
                       value={term.title}
                       onChange={(e) => updateTerminal(index, { title: e.target.value })}
                       className="h-7 text-xs bg-zinc-950/80 border-white/[0.08] flex-1"
                     />
+                    {macros.length > 0 && (
+                      <Select
+                        value=""
+                        onValueChange={(val) => {
+                          if (val) applyMacroToTerminal(index, Number(val));
+                        }}
+                      >
+                        <SelectTrigger className="h-7 px-2 text-[11px] text-muted-foreground hover:text-foreground bg-zinc-950 border-white/[0.08] w-auto gap-1" title="Populate settings from existing macro">
+                          <Zap className="h-3 w-3 text-amber-400" />
+                          <span className="hidden sm:inline">Macro</span>
+                        </SelectTrigger>
+                        <SelectContent>
+                          {macros.map((m) => (
+                            <SelectItem key={m.id} value={String(m.id)}>
+                              {m.name} {m.folder ? `(${m.folder})` : ""}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
                   </div>
 
                   <div className="flex items-center gap-1.5">
@@ -332,14 +438,15 @@ export default function WorkspaceModal({
                     </Select>
 
                     {terminals.length > 1 && (
-                      <button
-                        type="button"
-                        onClick={() => removeTerminal(index)}
-                        className="p-1 rounded text-muted-foreground/60 hover:text-red-400 transition-colors"
-                        title="Remove terminal"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </button>
+                      <Tooltip content="Remove terminal" side="top">
+                        <button
+                          type="button"
+                          onClick={() => removeTerminal(index)}
+                          className="p-1 rounded text-muted-foreground/60 hover:text-red-400 transition-colors cursor-pointer"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      </Tooltip>
                     )}
                   </div>
                 </div>
@@ -386,13 +493,18 @@ export default function WorkspaceModal({
                   )}
                 </div>
 
-                {/* Startup Command */}
-                <div>
-                  <Input
-                    placeholder="Startup command (e.g. uvicorn main:app --reload or npm run dev)"
+                {/* Startup Commands (Multi-line) */}
+                <div className="space-y-1">
+                  <div className="flex items-center justify-between text-[11px]">
+                    <label className="font-medium text-muted-foreground">Startup Commands (multi-line)</label>
+                    <span className="text-[10px] text-muted-foreground/60">One command per line</span>
+                  </div>
+                  <textarea
+                    rows={3}
+                    placeholder={"e.g.\n.\\venv\\Scripts\\activate\nuvicorn main:app --reload"}
                     value={term.startupCommand || ""}
                     onChange={(e) => updateTerminal(index, { startupCommand: e.target.value })}
-                    className="h-7 font-mono text-[11px] bg-zinc-950/80 border-white/[0.08]"
+                    className="w-full rounded-lg border border-white/[0.08] bg-zinc-950/80 p-2 font-mono text-[11px] shadow-xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary/50 text-foreground resize-y scrollbar-thin"
                   />
                 </div>
               </div>

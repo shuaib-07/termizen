@@ -1,5 +1,18 @@
 import { useRef, useState } from "react";
-import { Activity, Columns2, FileText, Globe, Rows2, Terminal as TerminalIcon, X, Zap } from "lucide-react";
+import {
+  Activity,
+  Columns2,
+  ExternalLink,
+  FileText,
+  Globe,
+  GripVertical,
+  Maximize2,
+  Minimize2,
+  Rows2,
+  Terminal as TerminalIcon,
+  X,
+  Zap,
+} from "lucide-react";
 import TabContent from "./TabContent";
 import { TerminalHandle, TerminalStatus } from "./Terminal";
 import { sshSession } from "./sessions";
@@ -8,6 +21,7 @@ import type { Pane, ServerHubSubView } from "./types";
 import { Button } from "@/components/ui/button";
 import { Tooltip } from "@/components/ui/tooltip";
 import { DirectionAwareTabs } from "@/components/ui/direction-aware-tabs";
+import { cn } from "@/lib/utils";
 
 export default function PaneView({
   pane,
@@ -25,6 +39,13 @@ export default function PaneView({
   onAddNewServer,
   onOpenMacroSidesheet,
   isVisible = true,
+  isFocused = false,
+  onFocus,
+  onGripPointerDown,
+  canMaximize = false,
+  isMaximized = false,
+  onToggleMaximize,
+  onExtractToNewTab,
 }: {
   pane: Pane;
   canSplit: boolean;
@@ -41,6 +62,13 @@ export default function PaneView({
   onAddNewServer?: () => void;
   onOpenMacroSidesheet?: (profileId?: number, terminalRef?: React.RefObject<TerminalHandle | null>) => void;
   isVisible?: boolean;
+  isFocused?: boolean;
+  onFocus?: () => void;
+  onGripPointerDown?: (e: React.PointerEvent) => void;
+  canMaximize?: boolean;
+  isMaximized?: boolean;
+  onToggleMaximize?: () => void;
+  onExtractToNewTab?: () => void;
 }) {
   const terminalRef = useRef<TerminalHandle>(null);
   const [, setStatus] = useState<TerminalStatus>("connecting");
@@ -53,8 +81,27 @@ export default function PaneView({
   const isSshProfile = pane.content.kind === "ssh" && pane.content.profileId != null && !isMacro;
 
   return (
-    <div className="flex h-full min-w-0 min-h-0 flex-col overflow-hidden rounded-xl border border-white/[0.04] bg-card">
-      <div className="flex items-center gap-1.5 border-b border-white/[0.03] bg-muted/40 px-2 py-1">
+    <div
+      onClick={onFocus}
+      className={cn(
+        "flex h-full min-w-0 min-h-0 flex-col overflow-hidden rounded-xl border bg-card transition-all duration-150",
+        isFocused
+          ? "border-primary/50 ring-1 ring-primary/40 shadow-sm"
+          : "border-white/[0.04]"
+      )}
+    >
+      <div className="flex items-center gap-1.5 border-b border-white/[0.03] bg-muted/40 px-2 py-1 select-none">
+        {onGripPointerDown && (
+          <Tooltip content="Drag to dock or swap pane" side="bottom">
+            <div
+              onPointerDown={onGripPointerDown}
+              className="cursor-grab active:cursor-grabbing p-0.5 -ml-0.5 text-zinc-500 hover:text-zinc-200 transition-colors select-none"
+            >
+              <GripVertical className="h-3.5 w-3.5" />
+            </div>
+          </Tooltip>
+        )}
+
         <div className="flex items-center gap-1 mr-1 min-w-0">
           {isMacro && <Zap className="h-3 w-3 text-amber-400 flex-shrink-0" />}
           <span className="truncate text-xs font-medium text-muted-foreground">{pane.title}</span>
@@ -117,16 +164,17 @@ export default function PaneView({
         <div className="flex-1" />
 
         {hasSession && subView === "terminal" && onOpenMacroSidesheet && (
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => onOpenMacroSidesheet(currentProfileId, terminalRef)}
-            className="flex items-center gap-1.5 h-6 px-2 text-[11px] font-medium rounded-lg bg-zinc-900/80 hover:bg-zinc-800/90 text-foreground border border-white/[0.06] shadow-xs hover:border-amber-400/30 transition-colors cursor-pointer"
-            title="Open Macro Cockpit"
-          >
-            <Zap className="h-3 w-3 text-amber-400" />
-            <span>Macros</span>
-          </Button>
+          <Tooltip content="Open Macro Cockpit" side="bottom">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => onOpenMacroSidesheet(currentProfileId, terminalRef)}
+              className="flex items-center gap-1.5 h-6 px-2 text-[11px] font-medium rounded-lg bg-zinc-900/80 hover:bg-zinc-800/90 text-foreground border border-white/[0.06] shadow-xs hover:border-amber-400/30 transition-colors cursor-pointer"
+            >
+              <Zap className="h-3 w-3 text-amber-400" />
+              <span>Macros</span>
+            </Button>
+          </Tooltip>
         )}
         {canSplit && (
           <>
@@ -141,6 +189,30 @@ export default function PaneView({
               </Button>
             </Tooltip>
           </>
+        )}
+        {canMaximize && onToggleMaximize && (
+          <Tooltip content={isMaximized ? "Restore grid (Alt+Z)" : "Maximize pane (Alt+Z)"} side="bottom">
+            <Button
+              variant="ghost"
+              size="icon"
+              className={cn("h-6 w-6", isMaximized && "text-primary hover:text-primary")}
+              onClick={onToggleMaximize}
+            >
+              {isMaximized ? <Minimize2 className="h-3.5 w-3.5" /> : <Maximize2 className="h-3.5 w-3.5" />}
+            </Button>
+          </Tooltip>
+        )}
+        {canClose && onExtractToNewTab && (
+          <Tooltip content="Pop out to new tab" side="bottom">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-6 w-6 text-muted-foreground hover:text-foreground"
+              onClick={onExtractToNewTab}
+            >
+              <ExternalLink className="h-3.5 w-3.5" />
+            </Button>
+          </Tooltip>
         )}
         {canClose && (
           <Tooltip content="Close pane" side="bottom">
@@ -164,6 +236,9 @@ export default function PaneView({
           onOpenProfile={(prof) => onOpenProfile?.(prof)}
           onEditProfile={(prof) => onEditProfile?.(prof)}
           onAddNewServer={() => onAddNewServer?.()}
+          onClearInitialCommands={() =>
+            onUpdate((p) => ({ ...p, content: { ...p.content, initialCommands: undefined } }))
+          }
           onConnect={(params: SshConnectParams) => {
             const session = sshSession(params);
             onUpdate((p) => ({

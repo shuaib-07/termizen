@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { Activity, Check, Folder, Info, Plus, Server, Sparkles, Upload } from "lucide-react";
+import { Activity, Check, Folder, Info, Server, Sparkles, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { PasswordInput } from "@/components/ui/password-input";
@@ -266,14 +266,6 @@ export default function ServerFormModal({
           <div className="col-span-2 sm:col-span-1">
             <div className="flex items-center justify-between">
               <label className="text-xs font-medium text-muted-foreground">Folder (Optional)</label>
-              <button
-                type="button"
-                onClick={() => setNewFolderModalOpen(true)}
-                className="text-[11px] text-primary hover:underline flex items-center gap-1 cursor-pointer font-medium"
-              >
-                <Plus className="h-3 w-3" />
-                <span>New Folder</span>
-              </button>
             </div>
             <div className="mt-1">
               <AnimatedCombobox
@@ -293,7 +285,7 @@ export default function ServerFormModal({
                 clearValue=""
                 icon={<Folder className="h-3.5 w-3.5" />}
                 onCreateNew={() => setNewFolderModalOpen(true)}
-                createNewText="+ Create new folder..."
+                createNewText="Create new folder..."
               />
             </div>
           </div>
