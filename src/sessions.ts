@@ -383,5 +383,39 @@ export const updateWorkspace = (params: {
 export const deleteWorkspace = (id: number) =>
   invoke<void>("workspace_delete", { id });
 
+// Background SSH Tunnels / Port Forwarding API
+export interface TunnelSummary {
+  id: string;
+  profileId: number;
+  profileName: string;
+  localPort: number;
+  remoteHost: string;
+  remotePort: number;
+  status: "active" | "error" | "stopped";
+  errorMessage?: string;
+  bytesTx: number;
+  bytesRx: number;
+  connectedClients: number;
+  createdAt: string;
+}
+
+export interface StartTunnelParams {
+  profileId: number;
+  localPort: number;
+  remoteHost: string;
+  remotePort: number;
+  profileName?: string;
+}
+
+export const startTunnel = (params: StartTunnelParams) =>
+  invoke<TunnelSummary>("tunnel_start", { params });
+
+export const stopTunnel = (id: string) =>
+  invoke<TunnelSummary>("tunnel_stop", { id });
+
+export const listTunnels = () =>
+  invoke<TunnelSummary[]>("tunnel_list");
+
+
 
 

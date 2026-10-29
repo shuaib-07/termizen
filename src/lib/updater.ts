@@ -1,11 +1,19 @@
 import { openUrl } from "@tauri-apps/plugin-opener";
+import { invoke } from "@tauri-apps/api/core";
 
-export const APP_VERSION = "0.3.0";
+export const APP_VERSION = "0.4.0";
 export const GITHUB_REPO = "shuaib-07/termizen";
 export const RELEASES_API_URL = `https://api.github.com/repos/${GITHUB_REPO}/releases/latest`;
 export const RELEASES_PAGE_URL = `https://github.com/${GITHUB_REPO}/releases`;
 
 const AUTO_CHECK_STORAGE_KEY = "termizen_auto_check_updates";
+
+export interface DownloadProgress {
+  downloadedBytes: number;
+  totalBytes: number | null;
+  percent: number;
+  speedBytesPerSec: number;
+}
 
 export interface UpdateInfo {
   updateAvailable: boolean;
@@ -16,7 +24,22 @@ export interface UpdateInfo {
   releaseUrl: string;
   publishedAt?: string;
   assetUrl?: string;
+  hasDirectInstaller?: boolean;
   error?: string;
+}
+
+export async function downloadAndInstallUpdate(
+  assetUrl: string,
+  version: string,
+  passive: boolean = true
+): Promise<void> {
+  return invoke<void>("app_download_and_install_update", {
+    params: {
+      assetUrl,
+      version,
+      passive,
+    },
+  });
 }
 
 /**
@@ -109,12 +132,14 @@ export async function checkAppUpdates(): Promise<UpdateInfo> {
 
     // Look for Windows installer asset (.exe or .msi)
     let assetUrl = data.html_url || RELEASES_PAGE_URL;
+    let hasDirectInstaller = false;
     if (Array.isArray(data.assets) && data.assets.length > 0) {
       const winAsset = data.assets.find((a: any) =>
         a.name?.endsWith(".exe") || a.name?.endsWith(".msi")
       );
       if (winAsset?.browser_download_url) {
         assetUrl = winAsset.browser_download_url;
+        hasDirectInstaller = true;
       }
     }
 
@@ -127,6 +152,7 @@ export async function checkAppUpdates(): Promise<UpdateInfo> {
       releaseUrl: data.html_url || RELEASES_PAGE_URL,
       publishedAt: data.published_at,
       assetUrl,
+      hasDirectInstaller,
     };
   } catch (err: any) {
     console.warn("Termizen update check failed:", err);

@@ -12,6 +12,12 @@ import {
   ConnectionErrorBanner,
   type ServerInfoMeta,
 } from "@/components/servers/ConnectionDiagnosticCard";
+import {
+  isPasswordPrompt,
+  isHostKeyConfirmationPrompt,
+  resolveAutoResponderSecret,
+} from "@/utils/promptAutoResponder";
+import type { ProfileSummary } from "@/sessions";
 
 export interface TerminalSession {
   spawn: (cols: number, rows: number) => Promise<number>;
@@ -44,17 +50,27 @@ export interface TerminalProps {
   serverInfo?: ServerInfoMeta;
   onEditServer?: () => void;
   onCloseTab?: () => void;
+  profiles?: ProfileSummary[];
+  profileId?: number;
+  autoResponderEnabled?: boolean;
+  customSecret?: string;
 }
 
 const Terminal = forwardRef<
   TerminalHandle,
   TerminalProps
->(({ session, onExit, onStatusChange, initialCommands, onInitialCommandsExecuted, serverInfo, onEditServer, onCloseTab }, ref) => {
+>(({ session, onExit, onStatusChange, initialCommands, onInitialCommandsExecuted, serverInfo, onEditServer, onCloseTab, profiles, profileId, autoResponderEnabled = true, customSecret }, ref) => {
     const outerRef = useRef<HTMLDivElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
     const termRef = useRef<XTerm | null>(null);
     const sessionIdRef = useRef<number | null>(null);
     const macroBufferRef = useRef("");
+    const promptBufferRef = useRef("");
+    const currentLineRef = useRef("");
+    const activeCommandRef = useRef(initialCommands?.[0] || "");
+    const passwordAttemptsRef = useRef(0);
+    const lastAttemptTimeRef = useRef(0);
+    const isResolvingSecretRef = useRef(false);
     const pendingMarkerRef = useRef<((code: number | null) => void) | null>(null);
     const resetActivityTimerRef = useRef<(() => void) | null>(null);
 
@@ -128,6 +144,8 @@ const Terminal = forwardRef<
                 cleanup();
                 resolve(code);
               };
+              activeCommandRef.current = steps[i];
+              passwordAttemptsRef.current = 0;
               void session.write(id, `${steps[i]}; echo TERMINA_EXIT:$?\r`);
             });
 
@@ -267,6 +285,8 @@ const Terminal = forwardRef<
             if (disposed || sessionIdRef.current === null) return;
             for (let i = 0; i < initialCommands.length; i++) {
               if (disposed || sessionIdRef.current === null) break;
+              activeCommandRef.current = initialCommands[i];
+              passwordAttemptsRef.current = 0;
               await session.write(sessionIdRef.current, `${initialCommands[i]}\r`);
               if (i < initialCommands.length - 1) {
                 await new Promise((r) => setTimeout(r, 120));
@@ -290,6 +310,61 @@ const Terminal = forwardRef<
             if (!initialTriggered) {
               clearTimeout(fallbackTimer);
               void triggerInitial();
+            }
+
+            // Interactive Auto-Responder for Passwords and Host Keys
+            promptBufferRef.current += event.payload.data;
+            if (promptBufferRef.current.length > 2048) {
+              promptBufferRef.current = promptBufferRef.current.slice(-1024);
+            }
+
+            // 1. Password / Passphrase / Sudo Prompt Auto-fill
+            if (
+              autoResponderEnabled &&
+              !isResolvingSecretRef.current &&
+              passwordAttemptsRef.current < 2 &&
+              isPasswordPrompt(promptBufferRef.current)
+            ) {
+              const now = Date.now();
+              if (now - lastAttemptTimeRef.current > 750) {
+                lastAttemptTimeRef.current = now;
+                isResolvingSecretRef.current = true;
+                passwordAttemptsRef.current += 1;
+
+                void (async () => {
+                  try {
+                    const result = await resolveAutoResponderSecret({
+                      activeCommand: activeCommandRef.current || currentLineRef.current,
+                      explicitProfileId: profileId ?? serverInfo?.profileId,
+                      customSecret,
+                      profiles,
+                    });
+
+                    if (result?.secret && sessionIdRef.current !== null && !disposed) {
+                      promptBufferRef.current = "";
+                      await session.write(sessionIdRef.current, `${result.secret}\r`);
+                      term.writeln(
+                        `\r\n\x1b[38;2;16;185;129m✔ [Termizen] Auto-filled password (${result.hint})\x1b[0m\r\n`
+                      );
+                    }
+                  } catch (err) {
+                    console.error("Auto responder failed:", err);
+                  } finally {
+                    isResolvingSecretRef.current = false;
+                  }
+                })();
+              }
+            }
+
+            // 2. SSH Host Key Fingerprint Confirmation ("Are you sure you want to continue connecting (yes/no/[fingerprint])?")
+            if (
+              autoResponderEnabled &&
+              isHostKeyConfirmationPrompt(promptBufferRef.current) &&
+              sessionIdRef.current !== null
+            ) {
+              promptBufferRef.current = "";
+              void session.write(sessionIdRef.current, "yes\r");
+              term.writeln(`\r\n\x1b[38;2;56;189;248m✔ [Termizen] Auto-confirmed SSH host key (yes)\x1b[0m\r\n`);
             }
 
             if (pendingMarkerRef.current) {
@@ -317,6 +392,15 @@ const Terminal = forwardRef<
         term.onData((data) => {
           setSelectionMenu(null);
           if (sessionIdRef.current !== null) void session.write(sessionIdRef.current, data);
+          if (data === "\r" || data === "\n") {
+            activeCommandRef.current = currentLineRef.current.trim();
+            currentLineRef.current = "";
+            passwordAttemptsRef.current = 0;
+          } else if (data === "\u007F" || data === "\b") {
+            currentLineRef.current = currentLineRef.current.slice(0, -1);
+          } else if (data.length === 1 && data.charCodeAt(0) >= 32) {
+            currentLineRef.current += data;
+          }
         });
       })();
 

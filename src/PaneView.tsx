@@ -12,6 +12,7 @@ import {
   Terminal as TerminalIcon,
   X,
   Zap,
+  Network,
 } from "lucide-react";
 import TabContent from "./TabContent";
 import { TerminalHandle, TerminalStatus } from "./Terminal";
@@ -144,6 +145,15 @@ export default function PaneView({
                   <>
                     <FileText className="h-3 w-3 text-emerald-400" />
                     <span className={subView === "logs" ? "text-emerald-400 font-semibold" : ""}>Live Logs</span>
+                  </>
+                ),
+              },
+              {
+                id: "tunnels",
+                label: (
+                  <>
+                    <Network className="h-3 w-3 text-purple-400" />
+                    <span className={subView === "tunnels" ? "text-purple-400 font-semibold" : ""}>Tunnels</span>
                   </>
                 ),
               },

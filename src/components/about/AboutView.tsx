@@ -39,6 +39,7 @@ import {
 } from "@/lib/updater";
 import { WhatsNewModal } from "./WhatsNewModal";
 import { LicenseModal } from "./LicenseModal";
+import { UpdatePromptModal } from "./UpdatePromptModal";
 import { cn } from "@/lib/utils";
 
 function GithubIcon({ className }: { className?: string }) {
@@ -83,6 +84,7 @@ export function AboutView({ initialUpdateInfo, onUpdateStatusChange }: AboutView
 
   const [whatsNewOpen, setWhatsNewOpen] = useState<boolean>(false);
   const [licenseOpen, setLicenseOpen] = useState<boolean>(false);
+  const [updatePromptOpen, setUpdatePromptOpen] = useState<boolean>(false);
 
   // Sync auto check preference
   const handleToggleAutoCheck = (checked: boolean) => {
@@ -286,11 +288,11 @@ export function AboutView({ initialUpdateInfo, onUpdateStatusChange }: AboutView
                       </div>
                       <Button
                         size="sm"
-                        className="h-7 text-xs gap-1.5 bg-primary text-primary-foreground hover:bg-primary/90 cursor-pointer"
-                        onClick={() => openExternalUrl(updateInfo.assetUrl || updateInfo.releaseUrl)}
+                        className="h-7 text-xs gap-1.5 bg-primary text-primary-foreground hover:bg-primary/90 cursor-pointer shadow-sm"
+                        onClick={() => setUpdatePromptOpen(true)}
                       >
                         <Download className="h-3 w-3" />
-                        <span>Download Update</span>
+                        <span>Update In-App</span>
                       </Button>
                     </div>
                   )}
@@ -728,6 +730,13 @@ export function AboutView({ initialUpdateInfo, onUpdateStatusChange }: AboutView
       <LicenseModal
         isOpen={licenseOpen}
         onClose={() => setLicenseOpen(false)}
+      />
+
+      {/* In-App Update Prompt Modal */}
+      <UpdatePromptModal
+        isOpen={updatePromptOpen}
+        onClose={() => setUpdatePromptOpen(false)}
+        updateInfo={updateInfo}
       />
     </div>
   );

@@ -6,6 +6,7 @@ import MacroEditorView from "./MacroEditorView";
 import ServerMonitor from "./components/monitor/ServerMonitor";
 import ServiceLogViewer from "./components/logs/ServiceLogViewer";
 import WebTrafficDashboard from "./components/traffic/WebTrafficDashboard";
+import { ServerTunnelsView } from "./components/tunnels/ServerTunnelsView";
 import { localSession } from "./sessions";
 import type { MacroSummary, ProfileSummary, SaveMacroParams, SshConnectParams } from "./sessions";
 import type { ServerHubSubView, TabContentState } from "./types";
@@ -107,6 +108,8 @@ const TabContent = forwardRef<
               username: profile?.username,
               authMethod: profile?.authMethod,
             }}
+            profiles={profiles}
+            profileId={profile?.id ?? (content.kind === "ssh" ? content.profileId : undefined)}
             onEditServer={profile && onEditProfile ? () => onEditProfile(profile) : undefined}
             onCloseTab={onCloseTab}
           />
@@ -137,6 +140,15 @@ const TabContent = forwardRef<
                 profileId={content.profileId}
                 serverName={profile?.name || content.profileName}
                 isVisible={isVisible && subView === "logs"}
+              />
+            </div>
+
+            <div className={`h-full w-full ${subView === "tunnels" ? "block" : "hidden"}`}>
+              <ServerTunnelsView
+                profileId={content.profileId}
+                serverName={profile?.name || content.profileName}
+                host={profile?.host || content.host}
+                isVisible={isVisible && subView === "tunnels"}
               />
             </div>
           </>

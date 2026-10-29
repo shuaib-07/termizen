@@ -5,6 +5,8 @@ mod monitor;
 mod pty;
 mod ssh;
 mod traffic;
+mod tunnel;
+mod updater;
 mod vault;
 
 use logs::LogStreamState;
@@ -12,6 +14,7 @@ use macro_exec::MacroExecState;
 use monitor::MonitorState;
 use pty::PtyState;
 use ssh::SshState;
+use tunnel::TunnelState;
 use tauri::menu::{Menu, MenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
 use tauri::Manager;
@@ -44,6 +47,7 @@ pub fn run() {
         .manage(MacroExecState::default())
         .manage(MonitorState::default())
         .manage(LogStreamState::default())
+        .manage(TunnelState::default())
         .setup(|app| {
             let vault = VaultState::init(&app.handle().clone()).expect("vault init");
             app.manage(vault);
@@ -151,6 +155,10 @@ pub fn run() {
             traffic::web_traffic_detect_logs,
             traffic::web_traffic_probe,
             vault::profile_set_web_log_path,
+            tunnel::tunnel_start,
+            tunnel::tunnel_stop,
+            tunnel::tunnel_list,
+            updater::app_download_and_install_update,
             app_hide_to_tray,
             app_show,
             app_exit,

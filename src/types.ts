@@ -1,5 +1,5 @@
 import type { TerminalSession } from "./Terminal";
-export type { ProfileSummary, MacroSummary, SaveProfileParams, SshConnectParams, SaveLocalProfileParams } from "./sessions";
+export type { ProfileSummary, MacroSummary, SaveProfileParams, SshConnectParams, SaveLocalProfileParams, TunnelSummary, StartTunnelParams } from "./sessions";
 
 export interface CpuMetrics {
   overall: number;
@@ -191,7 +191,7 @@ export interface WorkspaceSummary {
 
 export type SidebarViewMode = "dashboard" | "servers" | "macros" | "workspaces" | "keys" | "settings" | "about";
 
-export type ServerHubSubView = "terminal" | "monitor" | "traffic" | "logs" | "macros";
+export type ServerHubSubView = "terminal" | "monitor" | "traffic" | "logs" | "macros" | "tunnels";
 
 export type TabContentState =
   | { kind: "connect" }

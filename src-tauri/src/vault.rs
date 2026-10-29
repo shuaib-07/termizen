@@ -413,6 +413,15 @@ pub fn profile_list(vault: State<VaultState>) -> Result<Vec<ProfileSummary>, Str
     rows.collect::<Result<Vec<_>, _>>().map_err(|e| e.to_string())
 }
 
+pub fn get_profile_name(vault: &VaultState, id: i64) -> Result<String, String> {
+    let conn = vault.conn.lock().unwrap();
+    let mut stmt = conn
+        .prepare("SELECT name FROM profiles WHERE id = ?1")
+        .map_err(|e| e.to_string())?;
+    stmt.query_row(params![id], |row| row.get(0))
+        .map_err(|e| e.to_string())
+}
+
 pub fn get_profile_web_log_path(vault: &State<VaultState>, id: i64) -> Result<Option<String>, String> {
     let conn = vault.conn.lock().unwrap();
     let mut stmt = conn

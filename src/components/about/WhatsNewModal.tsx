@@ -1,4 +1,14 @@
-import { Sparkles, Terminal, Activity, Zap, Globe, CheckCircle2, ExternalLink, Layers } from "lucide-react";
+import {
+  Sparkles,
+  Zap,
+  Globe,
+  CheckCircle2,
+  ExternalLink,
+  Layers,
+  Network,
+  Download,
+  KeyRound,
+} from "lucide-react";
 import { Modal } from "@/components/ui/modal";
 import { Button } from "@/components/ui/button";
 import { openExternalUrl, APP_VERSION, type UpdateInfo } from "@/lib/updater";
@@ -12,6 +22,21 @@ interface WhatsNewModalProps {
 export function WhatsNewModal({ isOpen, onClose, latestUpdate }: WhatsNewModalProps) {
   const HIGHLIGHTS = [
     {
+      icon: Network,
+      title: "Native Background SSH Port Forwarding",
+      description: "Run persistent background port forward tunnels for databases (MongoDB, PostgreSQL, MySQL, Redis) and web services independently of terminal tabs.",
+    },
+    {
+      icon: KeyRound,
+      title: "Automated CLI Password & Secret Entry",
+      description: "Interactive PTY scanner detects password, passphrase, sudo, and SSH host key prompts in macros/workspaces, auto-filling credentials from Key Vault safely.",
+    },
+    {
+      icon: Download,
+      title: "One-Click In-App Update Downloader",
+      description: "Download and install updates directly within Termizen with live progress bar and speed tracking, followed by hands-free passive installation and auto-restart.",
+    },
+    {
       icon: Layers,
       title: "Workspaces & Multi-Terminal Stacks",
       description: "Define multi-terminal environment stacks to launch in separate tabs or unified split-screen grids with optional automated startup macros.",
@@ -23,23 +48,13 @@ export function WhatsNewModal({ isOpen, onClose, latestUpdate }: WhatsNewModalPr
     },
     {
       icon: Globe,
-      title: "Traffic Health & Scanner Detection",
-      description: "Plain-English server diagnosis banners, automatic 4xx/5xx security bot scanner detection, and live access log quick filter chips.",
-    },
-    {
-      icon: Terminal,
-      title: "Pane Drag-Drop & Tab Extraction",
-      description: "Intuitive drag handle to swap or dock terminal panes in any tree configuration, plus one-click pop-out to extract any split pane into a new dedicated tab.",
+      title: "Web Traffic & Error Inspection",
+      description: "Clear server diagnosis banners, automatic 4xx/5xx security bot scanner detection, and live access log quick filter chips.",
     },
     {
       icon: Sparkles,
       title: "Spring-Animated Tooltips & UI Polish",
-      description: "Collision-aware, portal-rendered spring tooltips across all buttons, standardized rectangular folder badges, and dynamic theme accent alignment.",
-    },
-    {
-      icon: Activity,
-      title: "Automated Launch Update Alerts",
-      description: "Optional startup update checks with instant update notification modal and direct one-click installer downloads from GitHub releases.",
+      description: "Collision-aware, portal-rendered spring tooltips across all buttons, standardized rectangular badges, and Mica accent alignment.",
     },
   ];
 
