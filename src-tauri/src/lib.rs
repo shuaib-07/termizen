@@ -1,3 +1,4 @@
+mod backup;
 mod discover;
 mod logs;
 mod macro_exec;
@@ -159,6 +160,9 @@ pub fn run() {
             tunnel::tunnel_stop,
             tunnel::tunnel_list,
             updater::app_download_and_install_update,
+            backup::vault_export_backup,
+            backup::vault_inspect_backup,
+            backup::vault_import_backup,
             app_hide_to_tray,
             app_show,
             app_exit,

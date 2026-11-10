@@ -8,6 +8,7 @@ import {
   Network,
   Download,
   KeyRound,
+  ShieldCheck,
 } from "lucide-react";
 import { Modal } from "@/components/ui/modal";
 import { Button } from "@/components/ui/button";
@@ -21,6 +22,16 @@ interface WhatsNewModalProps {
 
 export function WhatsNewModal({ isOpen, onClose, latestUpdate }: WhatsNewModalProps) {
   const HIGHLIGHTS = [
+    {
+      icon: ShieldCheck,
+      title: "Encrypted Vault Backup & Restore (.tzbackup)",
+      description: "Create portable, password-protected backups encrypted with AES-256-GCM and PBKDF2 (100,000 iterations). Safely migrate servers, SSH keys, macros, workspaces, and folder colors across machines with Safe Merge or Fresh Restore.",
+    },
+    {
+      icon: CheckCircle2,
+      title: "React 19 Tab Lifecycle & Viewport Stability",
+      description: "Eliminated conditional hook lifecycle errors (React error #310) across terminal tabs and web traffic monitors for completely seamless multi-server multitasking.",
+    },
     {
       icon: Network,
       title: "Native Background SSH Port Forwarding",

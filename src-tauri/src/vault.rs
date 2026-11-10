@@ -12,8 +12,8 @@ use winreg::RegKey;
 use crate::ssh::{self, SshState};
 
 pub struct VaultState {
-    conn: Mutex<Connection>,
-    key: [u8; 32],
+    pub(crate) conn: Mutex<Connection>,
+    pub(crate) key: [u8; 32],
 }
 
 impl VaultState {
@@ -175,7 +175,7 @@ fn machine_key() -> [u8; 32] {
     hasher.finalize().into()
 }
 
-fn encrypt(key: &[u8; 32], plaintext: &str) -> Vec<u8> {
+pub(crate) fn encrypt(key: &[u8; 32], plaintext: &str) -> Vec<u8> {
     let cipher = Aes256Gcm::new_from_slice(key).expect("32-byte key");
     let nonce = Aes256Gcm::generate_nonce(&mut OsRng);
     let ciphertext = cipher.encrypt(&nonce, plaintext.as_bytes()).expect("encryption failure");
@@ -184,7 +184,7 @@ fn encrypt(key: &[u8; 32], plaintext: &str) -> Vec<u8> {
     out
 }
 
-fn decrypt(key: &[u8; 32], blob: &[u8]) -> Result<String, String> {
+pub(crate) fn decrypt(key: &[u8; 32], blob: &[u8]) -> Result<String, String> {
     if blob.len() < 12 {
         return Err("corrupt vault entry".into());
     }

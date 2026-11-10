@@ -12,9 +12,16 @@ import {
   Minimize2,
   Power,
   RotateCcw,
+  Download,
+  Upload,
+  ShieldCheck,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ColorPicker } from "@/components/ui/color-picker";
+import { Button } from "@/components/ui/button";
+import { APP_VERSION } from "@/lib/updater";
+import { BackupExportModal } from "./BackupExportModal";
+import { BackupImportModal } from "./BackupImportModal";
 import {
   getStoredCloseBehavior,
   setStoredCloseBehavior,
@@ -74,10 +81,16 @@ export function applyTheme(theme: ThemeMode, accent: AccentMode) {
   );
 }
 
-export default function SettingsView() {
+export interface SettingsViewProps {
+  onRestoreComplete?: () => void;
+}
+
+export default function SettingsView({ onRestoreComplete }: SettingsViewProps = {}) {
   const [theme, setTheme] = useState<ThemeMode>(getStoredTheme);
   const [accent, setAccent] = useState<AccentMode>(getStoredAccent);
   const [closeBehavior, setCloseBehavior] = useState<AppCloseBehavior>(getStoredCloseBehavior);
+  const [exportModalOpen, setExportModalOpen] = useState(false);
+  const [importModalOpen, setImportModalOpen] = useState(false);
 
   useEffect(() => {
     applyTheme(theme, accent);
@@ -468,7 +481,56 @@ export default function SettingsView() {
         </div>
       </div>
 
-      {/* Section 3: System Information */}
+      {/* Section 3: Data Backup & Migration */}
+      <div className="space-y-3 pt-2">
+        <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground/80">
+          Data Backup & Migration
+        </div>
+
+        <div className="space-y-2">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 p-4 rounded-xl border border-white/[0.06] bg-card/60 hover:bg-card/80 transition-colors">
+            <div className="flex items-start md:items-center gap-3.5">
+              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 text-primary border border-primary/20 shrink-0">
+                <ShieldCheck className="h-4.5 w-4.5" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-medium text-foreground">Encrypted Vault Backup</span>
+                  <span className="text-[10px] px-2 py-0.2 rounded-full bg-white/[0.06] text-muted-foreground font-mono">
+                    .tzbackup
+                  </span>
+                </div>
+                <div className="text-xs text-muted-foreground mt-0.5 leading-relaxed">
+                  Export or import an encrypted archive containing server credentials, private keys, macros, workspaces, and folder customizations.
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2.5 shrink-0 pl-12 md:pl-0">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setExportModalOpen(true)}
+                className="text-xs gap-1.5 border-white/[0.08] hover:bg-white/[0.06] cursor-pointer"
+              >
+                <Download className="h-3.5 w-3.5 text-primary" />
+                Export Backup
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setImportModalOpen(true)}
+                className="text-xs gap-1.5 border-white/[0.08] hover:bg-white/[0.06] cursor-pointer"
+              >
+                <Upload className="h-3.5 w-3.5 text-sky-400" />
+                Restore Backup
+              </Button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Section 4: System Information */}
       <div className="space-y-3 pt-2">
         <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground/80">
           About & System
@@ -488,11 +550,22 @@ export default function SettingsView() {
               </div>
             </div>
             <div className="text-xs font-mono text-muted-foreground bg-white/[0.04] px-2.5 py-1 rounded-md border border-white/[0.06]">
-              v0.2.0-preview
+              v{APP_VERSION}
             </div>
           </div>
         </div>
       </div>
+
+      {/* Backup & Restore Modals */}
+      <BackupExportModal
+        isOpen={exportModalOpen}
+        onClose={() => setExportModalOpen(false)}
+      />
+      <BackupImportModal
+        isOpen={importModalOpen}
+        onClose={() => setImportModalOpen(false)}
+        onRestoreComplete={onRestoreComplete}
+      />
     </div>
   );
 }

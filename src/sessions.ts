@@ -416,6 +416,57 @@ export const stopTunnel = (id: string) =>
 export const listTunnels = () =>
   invoke<TunnelSummary[]>("tunnel_list");
 
+// Backup & Migration API
+export interface BackupSummary {
+  format: string;
+  appVersion: string;
+  exportedAt: string;
+  categories: string[];
+  serverCount: number;
+  keyCount: number;
+  macroCount: number;
+  macroGroupCount: number;
+  workspaceCount: number;
+  hasSettings: boolean;
+}
+
+export interface ImportResult {
+  serversImported: number;
+  keysImported: number;
+  macrosImported: number;
+  workspacesImported: number;
+  folderMetadata?: unknown;
+  settings?: unknown;
+}
+
+export const vaultExportBackup = (
+  password: string,
+  categories: string[],
+  folderMetadata?: unknown,
+  settings?: unknown
+) =>
+  invoke<string>("vault_export_backup", {
+    password,
+    categories,
+    folderMetadata: folderMetadata ?? null,
+    settings: settings ?? null,
+  });
+
+export const vaultInspectBackup = (encryptedData: string, password: string) =>
+  invoke<BackupSummary>("vault_inspect_backup", { encryptedData, password });
+
+export const vaultImportBackup = (
+  encryptedData: string,
+  password: string,
+  mode: "merge" | "replace"
+) =>
+  invoke<ImportResult>("vault_import_backup", {
+    encryptedData,
+    password,
+    mode,
+  });
+
+
 
 
 

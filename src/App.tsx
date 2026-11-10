@@ -1789,7 +1789,16 @@ function AppContent() {
 
           {/* Settings View */}
           <div className={cn("h-full w-full", activeNav === "settings" ? "block" : "hidden")}>
-            <SettingsView />
+            <SettingsView
+              onRestoreComplete={() => {
+                Promise.all([
+                  refreshProfiles(),
+                  refreshMacros(),
+                  refreshWorkspaces(),
+                  refreshMacroGroups(),
+                ]);
+              }}
+            />
           </div>
 
           {/* About View */}
