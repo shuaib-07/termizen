@@ -388,6 +388,120 @@ export default function WebTrafficDashboard({
     };
   }, [profileId, isPaused, isVisible, selectedLogPath]);
 
+  const filteredEndpoints = useMemo(() => {
+    if (!metrics) return [];
+    return metrics.topEndpoints.filter((e) =>
+      e.path.toLowerCase().includes(urlFilter.toLowerCase())
+    );
+  }, [metrics?.topEndpoints, urlFilter]);
+
+  const errorRequests = useMemo(() => {
+    if (!metrics) return [];
+    return metrics.recentRequests.filter((r) => r.status >= 400);
+  }, [metrics?.recentRequests]);
+
+  const groupedErrors = useMemo(() => {
+    if (!metrics) return [];
+    const map = new Map<
+      string,
+      { path: string; status: number; count: number; lastClientIp: string; isScannerProbe: boolean }
+    >();
+    for (const r of metrics.recentRequests) {
+      if (r.status >= 400) {
+        const key = `${r.status}:${r.path}`;
+        const existing = map.get(key);
+        const isScannerProbe = /wp-|\.env|\.git|phpmyadmin|actuator|\.php|admin|setup|config/i.test(r.path);
+        if (existing) {
+          existing.count += 1;
+          existing.lastClientIp = r.clientIp;
+        } else {
+          map.set(key, {
+            path: r.path,
+            status: r.status,
+            count: 1,
+            lastClientIp: r.clientIp,
+            isScannerProbe,
+          });
+        }
+      }
+    }
+    return Array.from(map.values()).sort((a, b) => b.count - a.count);
+  }, [metrics?.recentRequests]);
+
+  const healthAnalysis = useMemo(() => {
+    if (!metrics) {
+      return {
+        statusLevel: "healthy" as const,
+        title: "Web Server Healthy • All Systems Operational",
+        explanation: "Connecting to server...",
+        operationalPercent: 100,
+        trafficLoadDesc: "Idle / Minimal traffic",
+        hasScannerProbes: false,
+      };
+    }
+    const total = metrics.totalSampled || 1;
+    const s2xx = metrics.status.count2xx;
+    const s3xx = metrics.status.count3xx;
+    const s4xx = metrics.status.count4xx;
+    const s5xx = metrics.status.count5xx;
+    const operationalPercent = Math.min(100, Math.max(0, ((s2xx + s3xx) / total) * 100));
+
+    let statusLevel: "healthy" | "attention" | "critical" = "healthy";
+    let title = "Web Server Healthy • All Systems Operational";
+    let explanation = `Your server is successfully processing requests. ${
+      s3xx > 0
+        ? `${s3xx} requests were safely redirected (3xx), which is standard for HTTPS and canonical routing.`
+        : "Zero server or client faults detected."
+    }`;
+
+    if (s5xx > 0) {
+      statusLevel = "critical";
+      title = `Critical • ${s5xx} Server Crashes (5xx) Detected`;
+      explanation =
+        "Your backend returned 5xx server errors (500 Internal Error, 502 Bad Gateway). Check backend service status, memory limits, or application crash logs.";
+    } else if (s4xx > 0) {
+      statusLevel = "attention";
+      title = `Notice • ${s4xx} Client Errors (4xx) Detected`;
+      explanation = `Server backend is 100% stable with 0 crashes. ${s4xx} requests returned 4xx (e.g. 404 Not Found or bot scanner probes). Check the Broken Links inspector below.`;
+    }
+
+    let trafficLoadDesc = "Idle / Minimal traffic";
+    if (metrics.requestsPerSec >= 25) {
+      trafficLoadDesc = "High traffic load";
+    } else if (metrics.requestsPerSec >= 5) {
+      trafficLoadDesc = "Active moderate traffic";
+    } else if (metrics.requestsPerSec > 0) {
+      trafficLoadDesc = "Light traffic";
+    }
+
+    return {
+      statusLevel,
+      title,
+      explanation,
+      operationalPercent,
+      trafficLoadDesc,
+      hasScannerProbes: groupedErrors.some((e) => e.isScannerProbe),
+    };
+  }, [metrics, groupedErrors]);
+
+  const filteredRequests = useMemo(() => {
+    if (!metrics) return [];
+    return metrics.recentRequests.filter((r) => {
+      if (streamFilter === "errors" && r.status < 400) return false;
+      if (streamFilter === "api" && !/(\/api\/|\.json|graphql|v1\/|v2\/)/i.test(r.path)) return false;
+      if (streamFilter === "writes" && ["GET", "HEAD", "OPTIONS"].includes(r.method.toUpperCase())) return false;
+
+      if (!urlFilter.trim()) return true;
+      const q = urlFilter.toLowerCase();
+      return (
+        r.path.toLowerCase().includes(q) ||
+        r.clientIp.includes(q) ||
+        r.method.toLowerCase().includes(q) ||
+        String(r.status).includes(q)
+      );
+    });
+  }, [metrics?.recentRequests, streamFilter, urlFilter]);
+
   // Loading initial state
   if (loading && !metrics) {
     return (
@@ -482,106 +596,6 @@ export default function WebTrafficDashboard({
       </div>
     );
   }
-
-  const filteredEndpoints = useMemo(() => {
-    return metrics.topEndpoints.filter((e) =>
-      e.path.toLowerCase().includes(urlFilter.toLowerCase())
-    );
-  }, [metrics.topEndpoints, urlFilter]);
-
-  const errorRequests = useMemo(() => {
-    return metrics.recentRequests.filter((r) => r.status >= 400);
-  }, [metrics.recentRequests]);
-
-  const groupedErrors = useMemo(() => {
-    const map = new Map<
-      string,
-      { path: string; status: number; count: number; lastClientIp: string; isScannerProbe: boolean }
-    >();
-    for (const r of metrics.recentRequests) {
-      if (r.status >= 400) {
-        const key = `${r.status}:${r.path}`;
-        const existing = map.get(key);
-        const isScannerProbe = /wp-|\.env|\.git|phpmyadmin|actuator|\.php|admin|setup|config/i.test(r.path);
-        if (existing) {
-          existing.count += 1;
-          existing.lastClientIp = r.clientIp;
-        } else {
-          map.set(key, {
-            path: r.path,
-            status: r.status,
-            count: 1,
-            lastClientIp: r.clientIp,
-            isScannerProbe,
-          });
-        }
-      }
-    }
-    return Array.from(map.values()).sort((a, b) => b.count - a.count);
-  }, [metrics.recentRequests]);
-
-  const healthAnalysis = useMemo(() => {
-    const total = metrics.totalSampled || 1;
-    const s2xx = metrics.status.count2xx;
-    const s3xx = metrics.status.count3xx;
-    const s4xx = metrics.status.count4xx;
-    const s5xx = metrics.status.count5xx;
-    const operationalPercent = Math.min(100, Math.max(0, ((s2xx + s3xx) / total) * 100));
-
-    let statusLevel: "healthy" | "attention" | "critical" = "healthy";
-    let title = "Web Server Healthy • All Systems Operational";
-    let explanation = `Your server is successfully processing requests. ${
-      s3xx > 0
-        ? `${s3xx} requests were safely redirected (3xx), which is standard for HTTPS and canonical routing.`
-        : "Zero server or client faults detected."
-    }`;
-
-    if (s5xx > 0) {
-      statusLevel = "critical";
-      title = `Critical • ${s5xx} Server Crashes (5xx) Detected`;
-      explanation =
-        "Your backend returned 5xx server errors (500 Internal Error, 502 Bad Gateway). Check backend service status, memory limits, or application crash logs.";
-    } else if (s4xx > 0) {
-      statusLevel = "attention";
-      title = `Notice • ${s4xx} Client Errors (4xx) Detected`;
-      explanation = `Server backend is 100% stable with 0 crashes. ${s4xx} requests returned 4xx (e.g. 404 Not Found or bot scanner probes). Check the Broken Links inspector below.`;
-    }
-
-    let trafficLoadDesc = "Idle / Minimal traffic";
-    if (metrics.requestsPerSec >= 25) {
-      trafficLoadDesc = "High traffic load";
-    } else if (metrics.requestsPerSec >= 5) {
-      trafficLoadDesc = "Active moderate traffic";
-    } else if (metrics.requestsPerSec > 0) {
-      trafficLoadDesc = "Light traffic";
-    }
-
-    return {
-      statusLevel,
-      title,
-      explanation,
-      operationalPercent,
-      trafficLoadDesc,
-      hasScannerProbes: groupedErrors.some((e) => e.isScannerProbe),
-    };
-  }, [metrics, groupedErrors]);
-
-  const filteredRequests = useMemo(() => {
-    return metrics.recentRequests.filter((r) => {
-      if (streamFilter === "errors" && r.status < 400) return false;
-      if (streamFilter === "api" && !/(\/api\/|\.json|graphql|v1\/|v2\/)/i.test(r.path)) return false;
-      if (streamFilter === "writes" && ["GET", "HEAD", "OPTIONS"].includes(r.method.toUpperCase())) return false;
-
-      if (!urlFilter.trim()) return true;
-      const q = urlFilter.toLowerCase();
-      return (
-        r.path.toLowerCase().includes(q) ||
-        r.clientIp.includes(q) ||
-        r.method.toLowerCase().includes(q) ||
-        String(r.status).includes(q)
-      );
-    });
-  }, [metrics.recentRequests, streamFilter, urlFilter]);
 
   return (
     <div className="h-full overflow-y-auto bg-transparent text-foreground p-4 md:p-5 space-y-4 select-none font-sans">

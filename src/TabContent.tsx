@@ -53,6 +53,25 @@ const TabContent = forwardRef<
     },
     ref
   ) => {
+    const session = useMemo(() => {
+      if (content.kind === "local") {
+        return localSession(content.shell, content.cwd);
+      }
+      if (content.kind === "ssh") {
+        return content.session;
+      }
+      return null;
+    }, [
+      content.kind,
+      content.kind === "local" ? `${content.shell || ""}:${content.cwd || ""}` : null,
+      content.kind === "ssh" ? content.session : null,
+    ]);
+
+    const profileId = "profileId" in content ? content.profileId : undefined;
+    const profile = profileId ? profiles.find((p) => p.id === profileId) : undefined;
+    const initialCommands =
+      content.kind === "local" || content.kind === "ssh" ? content.initialCommands : undefined;
+
     if (content.kind === "connect") {
       return (
         <ServerLauncher
@@ -82,13 +101,9 @@ const TabContent = forwardRef<
       );
     }
 
-    const session = useMemo(
-      () => (content.kind === "local" ? localSession(content.shell, content.cwd) : content.session),
-      [content.kind, content.kind === "local" ? `${content.shell || ""}:${content.cwd || ""}` : content.session]
-    );
-    const profile = content.profileId ? profiles.find((p) => p.id === content.profileId) : undefined;
-    const initialCommands =
-      content.kind === "local" || content.kind === "ssh" ? content.initialCommands : undefined;
+    if (!session) {
+      return null;
+    }
 
     return (
       <div className="relative h-full w-full min-h-0 min-w-0">
